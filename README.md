@@ -47,3 +47,6 @@ git clone https://github.com/your-username/home-automation.git
 cd home-automation
 cd client
 npm install
+
+npm run dev
+
