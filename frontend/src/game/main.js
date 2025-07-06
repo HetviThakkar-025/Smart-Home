@@ -19,6 +19,7 @@ class MyGame extends Phaser.Scene {
     this.load.image('light', '/assets/devices/light.png');
     this.load.image("fan", "/assets/devices/fan.png");
     this.load.image("carpet", "/assets/devices/carpet.png");
+    this.load.image("mirror","/assets/devices/mirror.png")
   }
 
   create() {

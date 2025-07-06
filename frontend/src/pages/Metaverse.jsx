@@ -27,8 +27,14 @@ function Metaverse() {
     light: "💡",
     table: "🪑",
     fan: "🌀",
-    carpet:"📺"
-
+    carpet:"📺",
+    mirror:"💡",
+    chimney:"💡",
+    fridge:"💡",
+    bed:"💡",
+    oven:"💡",
+    sofa:"💡",
+    washingmachiene:"💡"
   };
 
   return (
@@ -45,7 +51,7 @@ function Metaverse() {
         
         {/* Device Buttons */}
         <div className="space-y-4">
-          {["tv", "light", "table","fan","carpet"].map((device) => (
+          {["tv", "light", "table","fan","carpet","mirror","chimney","fridge","mirror","oven","sofa","washingmachiene"].map((device) => (
             <button
               key={device}
               className="group w-full bg-gradient-to-r from-gray-700 to-gray-600 hover:from-blue-600 hover:to-purple-600 p-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 ease-in-out border border-gray-600 hover:border-blue-500 relative overflow-hidden"
