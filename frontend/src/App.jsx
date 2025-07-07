@@ -5,6 +5,7 @@ import Login from './pages/Login'
 import Register from './pages/Register'
 import Footer from './components/Fotter'
 import Metaverse from './pages/Metaverse'
+import Meta1bhk from './pages/Meta1bhk'
 
 function App() {
 
@@ -17,6 +18,7 @@ function App() {
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
           <Route path='/Metaverse' element={<Metaverse/>}></Route>
+          <Route path='/Metaverse/1bhk' element={<Meta1bhk/>}></Route>
         </Routes>
       </div>
       <Footer/>
