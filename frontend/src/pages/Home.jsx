@@ -90,7 +90,7 @@ function Home() {
             onMouseLeave={() => setHoveredButton(null)}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl blur opacity-75 group-hover:opacity-100 transition-opacity duration-300"></div>
-            <Link to='/Metaverse' className="relative flex items-center gap-3">
+            <Link to='/Homemeta' className="relative flex items-center gap-3">
               Enter Metaverse
             </Link>
           </a>
