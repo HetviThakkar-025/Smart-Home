@@ -17,16 +17,15 @@ function Navbar() {
   const navItems = [
     { id: 'home', label: 'Home', href: '/' },
     { id: 'dashboard', label: 'Dashboard', href: '/Dashboard' },
-    { id: 'devices', label: 'Devices', href: '/devices' },
-    { id: 'metaverse', label: 'Metaverse', href: '/metaverse' },
+    { id: 'metaverse', label: 'Metaverse', href: '/Homemeta' },
     { id: 'analytics', label: 'Analytics', href: '/analytics' }
   ];
 
   return (
     <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
       isScrolled 
-        ? 'bg-slate-900/80 backdrop-blur-xl border-b border-white/10' 
-        : 'bg-transparent'
+        ? 'bg-slate-900/80 backdrop-blur-xl' 
+        : 'bg-slate-900/80 backdrop-blur-xl border-b border-0'
     }`}>
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
