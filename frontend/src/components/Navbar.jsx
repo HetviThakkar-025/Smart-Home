@@ -16,7 +16,7 @@ function Navbar() {
 
   const navItems = [
     { id: 'home', label: 'Home', href: '/' },
-    { id: 'dashboard', label: 'Dashboard', href: '/dashboard' },
+    { id: 'dashboard', label: 'Dashboard', href: '/Dashboard' },
     { id: 'devices', label: 'Devices', href: '/devices' },
     { id: 'metaverse', label: 'Metaverse', href: '/metaverse' },
     { id: 'analytics', label: 'Analytics', href: '/analytics' }

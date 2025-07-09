@@ -102,18 +102,18 @@ function HomeMeta() {
                   {/* Glow Effect */}
                   <div className={`absolute inset-0 bg-gradient-to-r ${option.color} opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl ${option.shadow}`}></div>
                   
-                  {/* Card */}
+                  
                   <div className={`relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 h-64 flex flex-col items-center justify-center text-center transition-all duration-500 group-hover:bg-white/10 group-hover:border-white/20 ${
                     selectedOption?.id === option.id ? 'bg-white/10 border-white/20' : ''
                   }`}>
-                    {/* Icon Container */}
+                   
                     <div className={`mb-6 p-4 rounded-2xl bg-gradient-to-r ${option.color} shadow-lg group-hover:shadow-xl transition-all duration-300`}>
                       <div className="text-white">
                         {option.icon}
                       </div>
                     </div>
                     
-                    {/* Title */}
+                    
                     <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-white transition-colors">
                       {option.name}
                     </h3>
