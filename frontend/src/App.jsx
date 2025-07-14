@@ -9,7 +9,8 @@ import Footer from './components/Fotter';
 import Metaverse from './pages/Metaverse';
 import Meta1bhk from './pages/Meta1bhk';
 import Homemeta from './pages/Homemeta';
-import Dashboard from './components/Dashboard';
+import Dashboard from './pages/Dashboard';
+import Meta3bhk from './pages/Meta3bhk'
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
@@ -37,6 +38,7 @@ function App() {
           <Route path="/Metaverse/2bhk" element={<Metaverse />} />
           <Route path="/Homemeta" element={<Homemeta />} />
           <Route path="/Metaverse/1bhk" element={<Meta1bhk />} />
+          <Route path='/Metaverse/3bhk' element={<Meta3bhk/>}></Route>
         </Routes>
       </div>
       <Footer />

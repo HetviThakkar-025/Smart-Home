@@ -38,7 +38,7 @@ function Metaverse() {
   };
 
   return (
-    <div className="flex h-screen mt-20 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
+    <div className="flex h-screen pt-20 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
       {/* Enhanced Sidebar Menu */}
       <div className="w-64 bg-gradient-to-b from-gray-800 to-gray-900 text-white p-6 shadow-2xl border-r border-gray-700">
         {/* Header */}

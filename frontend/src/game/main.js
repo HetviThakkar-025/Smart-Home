@@ -1,389 +1,356 @@
-import Phaser from 'phaser';
+import Phaser from "phaser";
 
-class MyGame extends Phaser.Scene {
+const POWER_CONFIG = {
+  devices: {
+    light: { wattage: 60, type: 'light' },
+    fan: { wattage: 75, type: 'fan' },
+    tv: { wattage: 100, type: 'appliance' },
+    oven: { wattage: 1200, type: 'appliance' },
+    fridge: { wattage: 150, type: 'appliance', alwaysOn: true, dutyCycle: 0.7 },
+    mirror: { wattage: 10, type: 'light' },
+    chimney: { wattage: 50, type: 'fan' },
+    washingmachine: { wattage: 500, type: 'appliance' },
+    table: { wattage: 0, type: 'furniture' },
+    carpet: { wattage: 0, type: 'furniture' }
+  },
+  electricityRate: 0.15,
+  updateInterval: 5000 // 5 second updates
+};
+
+class SmartHomeScene extends Phaser.Scene {
   constructor() {
-    super('MyGame');
+    super("SmartHomeScene");
+    this.devices = [];
     this.lamps = [];
+    this.instantPower = 0;
+    this.dailyEnergy = 0;
+    this.dailyCost = 0;
+    this.peakPower = 0;
+    this.lastUpdateTime = Date.now();
   }
 
   preload() {
-    this.load.image('int1', '/assets/tilesets/int1.png');
-    this.load.image('int2', '/assets/tilesets/int2.png');
-    this.load.image('tiles2', '/assets/tilesets/tiles2.png');
-    this.load.image('tiles3', '/assets/tilesets/tiles3.png');
-    this.load.image('walls', '/assets/tilesets/walls.png');
-    this.load.tilemapTiledJSON('map', '/assets/tilemaps/map.tmj');
+    this.load.image("int1", "/assets/tilesets/int1.png");
+    this.load.image("int2", "/assets/tilesets/int2.png");
+    this.load.image("tiles2", "/assets/tilesets/tiles2.png");
+    this.load.image("tiles3", "/assets/tilesets/tiles3.png");
+    this.load.image("walls", "/assets/tilesets/walls.png");
+    this.load.tilemapTiledJSON("map", "/assets/tilemaps/map.tmj");
 
-    this.load.image('tv', '/assets/devices/tv.png');
-    this.load.image('table', '/assets/devices/table.png');
-    this.load.image('light', '/assets/devices/light.png');
-    this.load.image("fan", "/assets/devices/fan.png");
-    this.load.image("carpet", "/assets/devices/carpet.png");
-    this.load.image("mirror","/assets/devices/mirror.png")
+    Object.keys(POWER_CONFIG.devices).forEach(device => {
+      this.load.image(device, `/assets/devices/${device}.png`);
+    });
   }
 
   create() {
-    const map = this.make.tilemap({ key: 'map' });
-    const tilesets = [
-      map.addTilesetImage('int1', 'int1'),
-      map.addTilesetImage('int2', 'int2'),
-      map.addTilesetImage('tiles2', 'tiles2'),
-      map.addTilesetImage('tiles3', 'tiles3'),
-      map.addTilesetImage('walls', 'walls'),
-    ];
-
-    map.layers.forEach(layer => {
-      map.createLayer(layer.name, tilesets, 0, 0);
-    });
-
-    const zoom = Math.min(
-      this.sys.game.config.width / map.widthInPixels,
-      this.sys.game.config.height / map.heightInPixels
-    );
-    this.cameras.main.setZoom(zoom);
-    this.cameras.main.centerOn(map.widthInPixels / 2, map.heightInPixels / 2);
-
-    const lampLayer = map.getObjectLayer('lamps');
-    if (lampLayer) {
-      lampLayer.objects.forEach(obj => this.createLampZone(obj.x, obj.y, obj.width, obj.height));
+    // Load saved data
+    const savedPowerData = localStorage.getItem('powerData');
+    if (savedPowerData) {
+      try {
+        const { energy, cost, peak } = JSON.parse(savedPowerData);
+        this.dailyEnergy = energy || 0;
+        this.dailyCost = cost || 0;
+        this.peakPower = peak || 0;
+      } catch (e) {
+        console.error("Error loading power data:", e);
+      }
     }
 
-    window.addEventListener('message', (event) => {
-      if (event.data.type === 'ADD_DEVICE') {
-        this.addDraggableDevice(event.data.device);
+    // Setup game world
+    const map = this.make.tilemap({ key: "map" });
+    const tilesets = [
+      map.addTilesetImage("int1", "int1"),
+      map.addTilesetImage("int2", "int2"),
+      map.addTilesetImage("tiles2", "tiles2"),
+      map.addTilesetImage("tiles3", "tiles3"),
+      map.addTilesetImage("walls", "walls"),
+    ];
+
+    map.layers.forEach(layer => map.createLayer(layer.name, tilesets));
+    
+    // Setup camera
+    const zoom = Math.min(
+      this.cameras.main.width / map.widthInPixels,
+      this.cameras.main.height / map.heightInPixels
+    );
+    this.cameras.main.setZoom(zoom).centerOn(map.widthInPixels / 2, map.heightInPixels / 2);
+
+    // Create lamps
+    const lampLayer = map.getObjectLayer("lamps");
+    if (lampLayer) {
+      lampLayer.objects.forEach(obj => {
+        const lamp = this.add.zone(obj.x, obj.y, obj.width, obj.height)
+          .setOrigin(0)
+          .setInteractive({ useHandCursor: true })
+          .setData({ state: false });
+        
+        const label = this.add.text(obj.x + obj.width/2, obj.y - 15, "Lamp OFF", {
+          fontFamily: "Arial",
+          fontSize: "14px",
+          fill: "#ffffff",
+          backgroundColor: "#1a1a1a",
+          padding: { left: 10, right: 10, top: 5, bottom: 5 },
+          stroke: "#333333",
+          strokeThickness: 1
+        }).setOrigin(0.5).setDepth(1000);
+        
+        lamp.setData('label', label);
+        lamp.on("pointerdown", () => this.toggleLamp(lamp));
+        this.lamps.push(lamp);
+      });
+    }
+
+    // Setup power meter
+    this.powerText = this.add.text(10, 10, "Power: 0W", {
+      fontFamily: "Arial",
+      fontSize: "16px",
+      color: "#ffffff",
+      backgroundColor: "#000000",
+      padding: { left: 10, right: 10, top: 5, bottom: 5 }
+    }).setScrollFactor(0).setDepth(1000);
+
+    // Setup device interactions
+    window.addEventListener("message", event => {
+      if (event.data?.type === "ADD_DEVICE") {
+        this.addDevice(event.data.device);
       }
     });
-
     this.input.dragDistanceThreshold = 5;
     
     // Load saved devices
-    this.loadDevices();
+    const savedDevices = localStorage.getItem("savedDevices");
+    if (savedDevices) {
+      try {
+        JSON.parse(savedDevices).forEach(deviceData => {
+          this.addDevice(deviceData.key, deviceData.x, deviceData.y, deviceData.state);
+        });
+      } catch (e) {
+        console.error("Error loading saved devices:", e);
+      }
+    }
+
+    // Send initial data and start monitoring
+    this.sendInitialData();
+    this.startPowerMonitoring();
+    window.dispatchEvent(new Event('gameLoaded'));
+  }
+
+  addDevice(deviceKey, x = 100, y = 100, initialState = false) {
+    const device = this.add.image(x, y, deviceKey)
+      .setInteractive({ draggable: true })
+      .setDepth(500)
+      .setScale(1.2)
+      .setData({ state: initialState });
+
+    const deleteBtn = this.add.text(x + 30, y - 30, "✕", {
+      fontFamily: "Arial",
+      fontSize: "16px",
+      fill: "#ffffff",
+      backgroundColor: "#e74c3c",
+      padding: { left: 6, right: 6, top: 4, bottom: 4 },
+      stroke: "#c0392b",
+      strokeThickness: 1
+    }).setInteractive({ useHandCursor: true })
+     .setDepth(1000)
+     .setOrigin(0.5)
+     .setVisible(false);
+
+    // Double click to show delete button
+    let clickCount = 0;
+    device.on("pointerdown", () => {
+      clickCount++;
+      if (clickCount === 1) {
+        this.time.delayedCall(300, () => {
+          if (clickCount === 2) {
+            deleteBtn.setVisible(!deleteBtn.visible);
+          }
+          clickCount = 0;
+        });
+      }
+    });
+
+    // Delete device
+    deleteBtn.on("pointerdown", (pointer) => {
+      pointer.event.stopPropagation();
+      const elementsToRemove = [device, deleteBtn];
+      if (device.label) elementsToRemove.push(device.label);
+      
+      this.tweens.add({
+        targets: elementsToRemove,
+        alpha: 0,
+        scale: 0.8,
+        duration: 200,
+        onComplete: () => {
+          this.devices = this.devices.filter(d => d !== device);
+          elementsToRemove.forEach(el => el.destroy());
+          this.saveDevices();
+          this.updatePowerConsumption();
+        }
+      });
+    });
+
+    // Drag handling
+    device.on("drag", (pointer, dragX, dragY) => {
+      device.setPosition(dragX, dragY);
+      deleteBtn.setPosition(dragX + 30, dragY - 30);
+      if (device.label) device.label.setPosition(dragX, dragY + 40);
+    });
+
+    device.on("dragend", () => this.saveDevices());
+
+    // Setup device label if applicable
+    const deviceConfig = POWER_CONFIG.devices[deviceKey];
+    if (deviceConfig.type === 'light' || deviceConfig.type === 'fan') {
+      const labelText = `${deviceKey.charAt(0).toUpperCase() + deviceKey.slice(1)} ${initialState ? 'ON' : 'OFF'}`;
+      device.label = this.add.text(x, y + 40, labelText, {
+        fontFamily: "Arial",
+        fontSize: "14px",
+        fill: initialState ? "#00ff41" : "#ffffff",
+        backgroundColor: initialState ? "#0a2a0a" : "#1a1a1a",
+        padding: { left: 10, right: 10, top: 5, bottom: 5 },
+        stroke: initialState ? "#00aa00" : "#333333",
+        strokeThickness: 1
+      }).setOrigin(0.5).setDepth(1000);
+      
+      device.on("pointerup", () => {
+        const newState = !device.getData('state');
+        device.setData('state', newState);
+        device.label.setText(`${deviceKey.charAt(0).toUpperCase() + deviceKey.slice(1)} ${newState ? 'ON' : 'OFF'}`)
+             .setStyle({
+               fill: newState ? "#00ff41" : "#ffffff",
+               backgroundColor: newState ? "#0a2a0a" : "#1a1a1a",
+               stroke: newState ? "#00aa00" : "#333333"
+             });
+
+        if (deviceConfig.type === 'fan') {
+          if (newState) {
+            this.tweens.add({ targets: device, angle: 360, duration: 800, repeat: -1 });
+          } else {
+            device.angle = 0;
+            this.tweens.killTweensOf(device);
+          }
+        }
+        this.updatePowerConsumption();
+      });
+
+      if (deviceConfig.type === 'fan' && initialState) {
+        this.tweens.add({ targets: device, angle: 360, duration: 800, repeat: -1 });
+      }
+    }
+
+    this.devices.push(device);
+    this.updatePowerConsumption();
+  }
+
+  toggleLamp(lamp) {
+    const newState = !lamp.getData("state");
+    lamp.setData("state", newState);
+    
+    const label = lamp.getData('label');
+    label.setText(newState ? "Lamp ON" : "Lamp OFF")
+         .setStyle({
+           fill: newState ? "#00ff41" : "#ffffff",
+           backgroundColor: newState ? "#0a2a0a" : "#1a1a1a",
+           stroke: newState ? "#00aa00" : "#333333"
+         });
+    this.updatePowerConsumption();
+  }
+
+  updatePowerConsumption() {
+    const now = Date.now();
+    const timeElapsed = (now - this.lastUpdateTime) / 1000;
+    this.lastUpdateTime = now;
+
+    let totalPower = 0;
+    
+    // Calculate from lamps
+    this.lamps.forEach(lamp => {
+      if (lamp.getData('state')) totalPower += 60;
+    });
+
+    // Calculate from devices
+    this.devices.forEach(device => {
+      const config = POWER_CONFIG.devices[device.texture.key];
+      if (device.getData('state') || config.alwaysOn) {
+        totalPower += config.wattage * (config.alwaysOn ? config.dutyCycle : 1);
+      }
+    });
+
+    this.instantPower = Math.round(totalPower);
+    if (totalPower > this.peakPower) this.peakPower = Math.round(totalPower);
+    
+    // Update energy and cost
+    this.dailyEnergy += (totalPower * timeElapsed) / 3600;
+    this.dailyCost = (this.dailyEnergy / 1000) * POWER_CONFIG.electricityRate;
+
+    // Update power text
+    const color = this.instantPower > 1000 ? '#ff5555' : 
+                 this.instantPower > 500 ? '#ffaa00' : '#55ff55';
+    this.powerText.setText(`Power: ${this.instantPower}W`).setColor(color);
+
+    this.sendToDashboard();
+  }
+
+  startPowerMonitoring() {
+    this.time.addEvent({
+      delay: POWER_CONFIG.updateInterval,
+      callback: this.updatePowerConsumption,
+      callbackScope: this,
+      loop: true
+    });
+  }
+
+  sendInitialData() {
+    const payload = {
+      power: this.instantPower,
+      energy: parseFloat(this.dailyEnergy.toFixed(2)),
+      cost: parseFloat(this.dailyCost.toFixed(2)),
+      peak: this.peakPower,
+      lastUpdate: new Date().toLocaleTimeString(),
+      isInitialData: true
+    };
+
+    [window.parent, window].forEach(target => {
+      target?.postMessage({
+        type: "POWER_UPDATE",
+        payload
+      }, '*');
+    });
+  }
+
+  sendToDashboard() {
+    const payload = {
+      power: this.instantPower,
+      energy: parseFloat(this.dailyEnergy.toFixed(2)),
+      cost: parseFloat(this.dailyCost.toFixed(2)),
+      peak: this.peakPower,
+      lastUpdate: new Date().toLocaleTimeString()
+    };
+
+    // Save to localStorage
+    localStorage.setItem('powerData', JSON.stringify({
+      energy: this.dailyEnergy,
+      cost: this.dailyCost,
+      peak: this.peakPower
+    }));
+
+    // Send to dashboard
+    [window.parent, window].forEach(target => {
+      target?.postMessage({
+        type: "POWER_UPDATE",
+        payload
+      }, '*');
+    });
   }
 
   saveDevices() {
-    const devices = [];
-    this.children.each(child => {
-      if (child instanceof Phaser.GameObjects.Image && 
-          ['tv', 'table', 'light', 'fan', 'carpet'].includes(child.texture.key)) {
-        devices.push({
-          key: child.texture.key,
-          x: child.x,
-          y: child.y,
-          state: child.getData('state') || false
-        });
-      }
-    });
-    localStorage.setItem('savedDevices', JSON.stringify(devices));
-  }
-
-  loadDevices() {
-    const savedDevices = localStorage.getItem('savedDevices');
-    if (savedDevices) {
-      JSON.parse(savedDevices).forEach(deviceData => {
-        this.addSavedDevice(deviceData);
-      });
-    }
-  }
-
-  addSavedDevice(deviceData) {
-    const device = this.add.image(deviceData.x, deviceData.y, deviceData.key)
-      .setInteractive({ draggable: true })
-      .setDepth(500)
-      .setScale(1.2);
-    
-    device.setData('state', deviceData.state);
-    this.setupDeviceInteractions(device);
-    
-    if (deviceData.key === 'light' || deviceData.key === 'fan') {
-      this.createDeviceLabel(device, deviceData);
-    }
-  }
-
-  createDeviceLabel(device, deviceData) {
-    const isLight = deviceData.key === 'light';
-    const labelText = isLight ? 
-      (deviceData.state ? 'Light ON' : 'Light OFF') : 
-      (deviceData.state ? 'Fan ON' : 'Fan OFF');
-    
-    const label = this.add.text(device.x, device.y + 40, labelText, {
-      fontFamily: 'Arial',
-      fontSize: '14px',
-      fill: deviceData.state ? '#00ff41' : '#ffffff',
-      backgroundColor: deviceData.state ? '#0a2a0a' : '#1a1a1a',
-      padding: { left: 10, right: 10, top: 5, bottom: 5 },
-      stroke: deviceData.state ? '#00aa00' : '#333333',
-      strokeThickness: 1
-    }).setOrigin(0.5).setDepth(1000);
-
-    if (isLight) {
-      device.lightLabel = label;
-    } else {
-      device.fanLabel = label;
-      if (deviceData.state) {
-        this.tweens.add({
-          targets: device,
-          angle: 360,
-          duration: 800,
-          repeat: -1
-        });
-      }
-    }
-  }
-
-  createLampZone(x, y, width = 32, height = 32) {
-    const label = this.add.text(x + 10, y - 10, 'Lamp OFF', {
-      fontFamily: 'Arial',
-      fontSize: '14px',
-      fill: '#ffffff',
-      backgroundColor: '#1a1a1a',
-      padding: { left: 10, right: 10, top: 5, bottom: 5 },
-      stroke: '#333',
-      strokeThickness: 1,
-    }).setOrigin(0.5).setDepth(1000);
-
-    label.setScale(0.8);
-    label.setAlpha(0);
-    this.tweens.add({ targets: label, scale: 1, alpha: 1, duration: 300, ease: 'Back.easeOut' });
-
-    const zone = this.add.zone(x, y, width, height).setOrigin(0).setInteractive({ useHandCursor: true });
-    zone.setData('label', label);
-    zone.setData('state', false);
-
-    zone.on('pointerdown', () => {
-      const newState = !zone.getData('state');
-      zone.setData('state', newState);
-      label.setText(newState ? 'Lamp ON' : 'Lamp OFF');
-      label.setStyle({
-        fill: newState ? '#00ff41' : '#ffffff',
-        backgroundColor: newState ? '#0a2a0a' : '#1a1a1a',
-        stroke: newState ? '#00aa00' : '#333333'
-      });
-
-      this.tweens.add({
-        targets: label,
-        scale: 0.9,
-        duration: 100,
-        yoyo: true,
-        ease: 'Power2',
-      });
-    });
-
-    this.lamps.push(zone);
-  }
-
-  addDraggableDevice(deviceKey) {
-    const x = 100;
-    const y = 100;
-    const device = this.add.image(x, y, deviceKey).setInteractive({ draggable: true }).setDepth(500);
-    device.setScale(1.2);
-    this.input.setDraggable(device);
-
-    const deleteBtn = this.add.text(x + 30, y - 30, '✕', {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      fill: '#ffffff',
-      backgroundColor: '#e74c3c',
-      padding: { left: 6, right: 6, top: 4, bottom: 4 },
-      stroke: '#c0392b',
-      strokeThickness: 1,
-    }).setInteractive({ useHandCursor: true }).setDepth(1000).setOrigin(0.5).setVisible(false);
-
-    let clickTimer = null;
-    let clickCount = 0;
-
-    device.on('pointerdown', () => {
-      clickCount++;
-      if (clickTimer) clearTimeout(clickTimer);
-      clickTimer = this.time.delayedCall(250, () => {
-        if (clickCount === 2) {
-          deleteBtn.setVisible(!deleteBtn.visible);
-        }
-        clickCount = 0;
-      });
-    });
-
-    deleteBtn.on('pointerdown', () => {
-      this.tweens.add({
-        targets: [device, deleteBtn],
-        scale: 0.8,
-        alpha: 0.5,
-        duration: 150,
-        onComplete: () => {
-          device.removeAllListeners();
-          deleteBtn.removeAllListeners();
-
-          device.destroy();
-          deleteBtn.destroy();
-
-          if (device.lightLabel) device.lightLabel.destroy();
-          if (device.fanLabel) device.fanLabel.destroy();
-          
-          this.saveDevices();
-        },
-      });
-    });
-
-    device.on('drag', (pointer, dragX, dragY) => {
-      device.setPosition(dragX, dragY);
-      deleteBtn.setPosition(dragX + 30, dragY - 30);
-
-      if (device.lightLabel) device.lightLabel.setPosition(dragX, dragY + 40);
-      if (device.fanLabel) device.fanLabel.setPosition(dragX, dragY + 40);
-    });
-
-    device.on('dragend', () => {
-      this.saveDevices();
-    });
-
-    if (deviceKey === 'light') {
-      const lightLabel = this.add.text(x, y + 40, 'Light OFF', {
-        fontFamily: 'Arial',
-        fontSize: '14px',
-        fill: '#ffffff',
-        backgroundColor: '#1a1a1a',
-        padding: { left: 10, right: 10, top: 5, bottom: 5 },
-        stroke: '#333333',
-        strokeThickness: 1
-      }).setOrigin(0.5).setDepth(1000);
-
-      lightLabel.setAlpha(0);
-      this.tweens.add({ targets: lightLabel, alpha: 1, duration: 300 });
-
-      device.setData('state', false);
-      device.lightLabel = lightLabel;
-
-      device.on('pointerup', () => {
-        const newState = !device.getData('state');
-        device.setData('state', newState);
-        lightLabel.setText(newState ? 'Light ON' : 'Light OFF');
-        lightLabel.setStyle({
-          fill: newState ? '#00ff41' : '#ffffff',
-          backgroundColor: newState ? '#0a2a0a' : '#1a1a1a',
-          stroke: newState ? '#00aa00' : '#333333'
-        });
-
-        this.tweens.add({
-          targets: lightLabel,
-          scale: 0.95,
-          duration: 100,
-          yoyo: true,
-        });
-        
-        this.saveDevices();
-      });
-    }
-
-    if (deviceKey === 'fan') {
-      const fanLabel = this.add.text(x, y + 40, 'Fan OFF', {
-        fontFamily: 'Arial',
-        fontSize: '14px',
-        fill: '#ffffff',
-        backgroundColor: '#1a1a1a',
-        padding: { left: 10, right: 10, top: 5, bottom: 5 },
-        stroke: '#333333',
-        strokeThickness: 1
-      }).setOrigin(0.5).setDepth(1000);
-
-      fanLabel.setAlpha(0);
-      this.tweens.add({ targets: fanLabel, alpha: 1, duration: 300 });
-
-      device.setData('state', false);
-      device.fanLabel = fanLabel;
-
-      device.on('pointerup', () => {
-        const newState = !device.getData('state');
-        device.setData('state', newState);
-
-        fanLabel.setText(newState ? 'Fan ON' : 'Fan OFF');
-        fanLabel.setStyle({
-          fill: newState ? '#00ff41' : '#ffffff',
-          backgroundColor: newState ? '#0a2a0a' : '#1a1a1a',
-          stroke: newState ? '#00aa00' : '#333333'
-        });
-
-        if (newState) {
-          this.tweens.add({
-            targets: device,
-            angle: 360,
-            duration: 800,
-            repeat: -1
-          });
-        } else {
-          device.angle = 0;
-          this.tweens.killTweensOf(device);
-        }
-
-        this.tweens.add({
-          targets: fanLabel,
-          scale: 0.95,
-          duration: 100,
-          yoyo: true,
-        });
-        
-        this.saveDevices();
-      });
-    }
-    
-    this.saveDevices();
-  }
-
-  setupDeviceInteractions(device) {
-    const deleteBtn = this.add.text(device.x + 30, device.y - 30, '✕', {
-      fontFamily: 'Arial',
-      fontSize: '16px',
-      fill: '#ffffff',
-      backgroundColor: '#e74c3c',
-      padding: { left: 6, right: 6, top: 4, bottom: 4 },
-      stroke: '#c0392b',
-      strokeThickness: 1,
-    }).setInteractive({ useHandCursor: true }).setDepth(1000).setOrigin(0.5).setVisible(false);
-
-    let clickTimer = null;
-    let clickCount = 0;
-
-    device.on('pointerdown', () => {
-      clickCount++;
-      if (clickTimer) clearTimeout(clickTimer);
-      clickTimer = this.time.delayedCall(250, () => {
-        if (clickCount === 2) {
-          deleteBtn.setVisible(!deleteBtn.visible);
-        }
-        clickCount = 0;
-      });
-    });
-
-    deleteBtn.on('pointerdown', () => {
-      this.tweens.add({
-        targets: [device, deleteBtn],
-        scale: 0.8,
-        alpha: 0.5,
-        duration: 150,
-        onComplete: () => {
-          device.removeAllListeners();
-          deleteBtn.removeAllListeners();
-
-          device.destroy();
-          deleteBtn.destroy();
-
-          if (device.lightLabel) device.lightLabel.destroy();
-          if (device.fanLabel) device.fanLabel.destroy();
-          
-          this.saveDevices();
-        },
-      });
-    });
-
-    device.on('drag', (pointer, dragX, dragY) => {
-      device.setPosition(dragX, dragY);
-      deleteBtn.setPosition(dragX + 30, dragY - 30);
-
-      if (device.lightLabel) device.lightLabel.setPosition(dragX, dragY + 40);
-      if (device.fanLabel) device.fanLabel.setPosition(dragX, dragY + 40);
-    });
-
-    device.on('dragend', () => {
-      this.saveDevices();
-    });
+    const devices = this.devices.map(device => ({
+      key: device.texture.key,
+      x: device.x,
+      y: device.y,
+      state: device.getData('state')
+    }));
+    localStorage.setItem("savedDevices", JSON.stringify(devices));
   }
 }
 
@@ -391,11 +358,12 @@ const config = {
   type: Phaser.AUTO,
   width: window.innerWidth,
   height: window.innerHeight,
-  parent: 'phaser-container',
-  scene: MyGame,
-  backgroundColor: '#222',
+  parent: "phaser-container",
+  scene: SmartHomeScene,
+  backgroundColor: "#222"
 };
 
-window.addEventListener('load', () => {
-  new Phaser.Game(config);
+window.addEventListener("load", () => {
+  const game = new Phaser.Game(config);
+  window.gameScene = game.scene.getScene("SmartHomeScene");
 });
