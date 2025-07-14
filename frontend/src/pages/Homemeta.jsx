@@ -1,47 +1,47 @@
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
-import { Home, Palette, Settings, Sparkles } from 'lucide-react';
+import React, { useState } from "react";
+import { Link } from "react-router-dom";
+import { Home, Palette, Settings, Sparkles } from "lucide-react";
 
 function HomeMeta() {
   const [selectedOption, setSelectedOption] = useState(null);
 
   const options = [
     {
-      id: '1bhk',
-      name: '1 BHK',
+      id: "1bhk",
+      name: "1 BHK",
       icon: <Home className="w-12 h-12" />,
-      color: 'from-cyan-400 to-blue-500',
-      shadow: 'shadow-cyan-500/50',
-      description: 'Cozy Studio Space',
-      link: '/Metaverse/1bhk'
+      color: "from-cyan-400 to-blue-500",
+      shadow: "shadow-cyan-500/50",
+      description: "Cozy Studio Space",
+      link: "/Metaverse/1bhk",
     },
     {
-      id: '2bhk',
-      name: '2 BHK',
+      id: "2bhk",
+      name: "2 BHK",
       icon: <Home className="w-12 h-12" />,
-      color: 'from-green-400 to-emerald-500',
-      shadow: 'shadow-green-500/50',
-      description: 'Family Comfort',
-      link: '/Metaverse/2bhk'
+      color: "from-green-400 to-emerald-500",
+      shadow: "shadow-green-500/50",
+      description: "Family Comfort",
+      link: "/Metaverse/2bhk",
     },
     {
-      id: '3bhk',
-      name: '3 BHK',
+      id: "3bhk",
+      name: "3 BHK",
       icon: <Home className="w-12 h-12" />,
-      color: 'from-orange-400 to-red-500',
-      shadow: 'shadow-orange-500/50',
-      description: 'Luxury Living',
-      link: '/3bhk-home'
+      color: "from-orange-400 to-red-500",
+      shadow: "shadow-orange-500/50",
+      description: "Luxury Living",
+      link: "/Metaverse/3bhK",
     },
     {
-      id: 'customize',
-      name: 'Customize',
+      id: "customize",
+      name: "Customize",
       icon: <Settings className="w-12 h-12" />,
-      color: 'from-purple-400 to-pink-500',
-      shadow: 'shadow-purple-500/50',
-      description: 'Design Your Own',
-      link: '/customize-home'
-    }
+      color: "from-purple-400 to-pink-500",
+      shadow: "shadow-purple-500/50",
+      description: "Design Your Own",
+      link: "/customize-home",
+    },
   ];
 
   const handleOptionClick = (option) => {
@@ -59,13 +59,16 @@ function HomeMeta() {
 
       {/* Grid Pattern Overlay */}
       <div className="absolute inset-0 opacity-10">
-        <div className="w-full h-full" style={{
-          backgroundImage: `
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
             linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
           `,
-          backgroundSize: '50px 50px'
-        }}></div>
+            backgroundSize: "50px 50px",
+          }}
+        ></div>
       </div>
 
       <div className="relative z-10 p-8">
@@ -88,48 +91,47 @@ function HomeMeta() {
         <div className="max-w-6xl mx-auto">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {options.map((option) => (
-              <Link
-                key={option.id}
-                to={option.link}
-                className="block"
-              >
+              <Link key={option.id} to={option.link} className="block">
                 <div
                   className={`group relative cursor-pointer transform transition-all duration-500 hover:scale-110 ${
-                    selectedOption?.id === option.id ? 'scale-110' : ''
+                    selectedOption?.id === option.id ? "scale-110" : ""
                   }`}
                   onClick={() => handleOptionClick(option)}
                 >
                   {/* Glow Effect */}
-                  <div className={`absolute inset-0 bg-gradient-to-r ${option.color} opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl ${option.shadow}`}></div>
-                  
-                  
-                  <div className={`relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 h-64 flex flex-col items-center justify-center text-center transition-all duration-500 group-hover:bg-white/10 group-hover:border-white/20 ${
-                    selectedOption?.id === option.id ? 'bg-white/10 border-white/20' : ''
-                  }`}>
-                   
-                    <div className={`mb-6 p-4 rounded-2xl bg-gradient-to-r ${option.color} shadow-lg group-hover:shadow-xl transition-all duration-300`}>
-                      <div className="text-white">
-                        {option.icon}
-                      </div>
+                  <div
+                    className={`absolute inset-0 bg-gradient-to-r ${option.color} opacity-0 group-hover:opacity-20 transition-opacity duration-500 rounded-3xl blur-xl ${option.shadow}`}
+                  ></div>
+
+                  <div
+                    className={`relative bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8 h-64 flex flex-col items-center justify-center text-center transition-all duration-500 group-hover:bg-white/10 group-hover:border-white/20 ${
+                      selectedOption?.id === option.id
+                        ? "bg-white/10 border-white/20"
+                        : ""
+                    }`}
+                  >
+                    <div
+                      className={`mb-6 p-4 rounded-2xl bg-gradient-to-r ${option.color} shadow-lg group-hover:shadow-xl transition-all duration-300`}
+                    >
+                      <div className="text-white">{option.icon}</div>
                     </div>
-                    
-                    
+
                     <h3 className="text-2xl font-bold text-white mb-2 group-hover:text-white transition-colors">
                       {option.name}
                     </h3>
-                    
+
                     {/* Description */}
                     <p className="text-white/60 text-sm font-light group-hover:text-white/80 transition-colors">
                       {option.description}
                     </p>
-                    
+
                     {/* Selection Indicator */}
                     {selectedOption?.id === option.id && (
                       <div className="absolute -top-2 -right-2 w-6 h-6 bg-gradient-to-r from-cyan-400 to-pink-400 rounded-full flex items-center justify-center">
                         <div className="w-3 h-3 bg-white rounded-full"></div>
                       </div>
                     )}
-                    
+
                     {/* Hover Border Animation */}
                     <div className="absolute inset-0 rounded-3xl border-2 border-transparent group-hover:border-gradient-to-r group-hover:from-cyan-400 group-hover:to-pink-400 transition-all duration-500"></div>
                   </div>
@@ -143,14 +145,16 @@ function HomeMeta() {
         {selectedOption && (
           <div className="text-center mt-16">
             <div className="inline-flex items-center gap-3 px-8 py-4 bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20">
-              <div className={`p-2 rounded-lg bg-gradient-to-r ${selectedOption.color}`}>
-                <div className="text-white text-sm">
-                  {selectedOption.icon}
-                </div>
+              <div
+                className={`p-2 rounded-lg bg-gradient-to-r ${selectedOption.color}`}
+              >
+                <div className="text-white text-sm">{selectedOption.icon}</div>
               </div>
               <div>
                 <p className="text-white/70 text-sm">Selected Option</p>
-                <p className="text-white font-semibold text-lg">{selectedOption.name}</p>
+                <p className="text-white font-semibold text-lg">
+                  {selectedOption.name}
+                </p>
               </div>
             </div>
           </div>
