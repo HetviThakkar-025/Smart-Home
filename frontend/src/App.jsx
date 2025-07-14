@@ -11,6 +11,7 @@ import Meta1bhk from './pages/Meta1bhk';
 import Homemeta from './pages/Homemeta';
 import Dashboard from './pages/Dashboard';
 import Meta3bhk from './pages/Meta3bhk'
+import AnalyticsPage from './pages/AnalyticsPage';
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
@@ -39,6 +40,7 @@ function App() {
           <Route path="/Homemeta" element={<Homemeta />} />
           <Route path="/Metaverse/1bhk" element={<Meta1bhk />} />
           <Route path='/Metaverse/3bhk' element={<Meta3bhk/>}></Route>
+          <Route path='/analytics' element={<AnalyticsPage/>}></Route>
         </Routes>
       </div>
       <Footer />
