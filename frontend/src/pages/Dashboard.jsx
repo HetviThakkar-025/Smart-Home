@@ -1,175 +1,181 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 
-function Dashboard() {
-  const [powerData, setPowerData] = useState(() => {
-    // Try to load from localStorage first
-    const cachedData = localStorage.getItem('dashboardData');
-    if (cachedData) {
-      return JSON.parse(cachedData);
-    }
-    
-    // Default empty state
-    return {
-      power: 0,
-      energy: 0,
-      cost: 0,
-      peak: 0,
-      lastUpdate: 'Loading...',
-      isInitialData: false
-    };
+export default function Dashboard() {
+  const [powerData, setPowerData] = useState({
+    power: 0,
+    energy: 0,
+    cost: 0,
+    peak: 0,
+    minuteCost: 0,
+    lastUpdate: 'Never',
+    devices: [],
+    deviceCounts: {},
+    activeDevices: {}
   });
-
-  const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
     const handleMessage = (event) => {
       if (event.data?.type === "POWER_UPDATE") {
-        setIsConnected(true);
+        setPowerData(event.data.payload);
         
-        const newData = {
-          power: event.data.payload.power,
-          energy: parseFloat(event.data.payload.energy.toFixed(2)),
-          cost: parseFloat(event.data.payload.cost.toFixed(2)),
-          peak: event.data.payload.peak,
-          lastUpdate: event.data.payload.lastUpdate || new Date().toLocaleTimeString(),
-          isInitialData: event.data.payload.isInitialData || false
-        };
-
-        setPowerData(newData);
-        localStorage.setItem('dashboardData', JSON.stringify(newData));
+        // Optional: Send data to backend
+        fetch('/api/power', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(event.data.payload),
+        });
       }
     };
 
     window.addEventListener('message', handleMessage);
+    
+    // Load initial data if available
+    const savedData = localStorage.getItem('powerData');
+    if (savedData) {
+      try {
+        const parsedData = JSON.parse(savedData);
+        setPowerData(prev => ({
+          ...prev,
+          energy: parsedData.energy || 0,
+          cost: parsedData.cost || 0,
+          peak: parsedData.peak || 0,
+          deviceCounts: parsedData.devices?.counts || {},
+          activeDevices: parsedData.devices?.active || {}
+        }));
+      } catch (e) {
+        console.error("Error loading saved data:", e);
+      }
+    }
 
-    // Check for new day
-    const checkNewDay = () => {
-      const today = new Date().toDateString();
-      const lastUpdateDate = localStorage.getItem('lastDashboardUpdateDate');
-      
-      if (lastUpdateDate !== today) {
-        localStorage.setItem('lastDashboardUpdateDate', today);
-        localStorage.removeItem('dashboardData');
-        setPowerData({
-          power: 0,
-          energy: 0,
-          cost: 0,
-          peak: 0,
-          lastUpdate: 'New day started',
-          isInitialData: true
-        });
-        
-        if (window.gameScene) {
-          window.gameScene.dailyEnergy = 0;
-          window.gameScene.dailyCost = 0;
-          window.gameScene.peakPower = 0;
-          window.gameScene.sendToDashboard();
-        }
+    // Fetch historical data
+    const fetchHistoricalData = async () => {
+      try {
+        const response = await fetch('/api/power');
+        const data = await response.json();
+        console.log('Historical data:', data);
+      } catch (error) {
+        console.error('Error fetching historical data:', error);
       }
     };
 
-    checkNewDay();
-
-    // Request initial data if game is loaded
-    if (window.gameScene) {
-      window.gameScene.sendInitialData();
-    } else {
-      // If game isn't loaded yet, set up a listener
-      const gameLoadListener = () => {
-        if (window.gameScene) {
-          window.gameScene.sendInitialData();
-          window.removeEventListener('gameLoaded', gameLoadListener);
-        }
-      };
-      window.addEventListener('gameLoaded', gameLoadListener);
-    }
+    fetchHistoricalData();
 
     return () => {
       window.removeEventListener('message', handleMessage);
     };
   }, []);
 
-  const getPowerColor = (watts) => {
-    if (watts > 1000) return 'text-red-500';
-    if (watts > 500) return 'text-yellow-500';
-    return 'text-green-500';
-  };
-
-  const getEnergyColor = (wh) => {
-    if (wh > 5000) return 'text-red-400';
-    if (wh > 2000) return 'text-yellow-400';
-    return 'text-green-400';
-  };
-
-  const resetDashboard = () => {
-    if (window.gameScene) {
-      window.gameScene.dailyEnergy = 0;
-      window.gameScene.dailyCost = 0;
-      window.gameScene.peakPower = 0;
-      window.gameScene.sendToDashboard();
-    }
-    setPowerData({
-      power: 0,
-      energy: 0,
-      cost: 0,
-      peak: 0,
-      lastUpdate: 'Manually reset',
-      isInitialData: true
-    });
-    localStorage.removeItem('dashboardData');
-  };
-
   return (
-    <div className="p-4 max-w-md mx-auto">
-      <div className="bg-gray-800 text-white p-6 rounded-lg shadow-lg">
-        <div className="flex justify-between items-center mb-4">
-          <h1 className="text-2xl font-bold">🏠 Smart Home Dashboard</h1>
-          <button 
-            onClick={resetDashboard}
-            className="text-xs bg-red-600 hover:bg-red-700 px-2 py-1 rounded"
-            title="Reset daily stats"
-          >
-            Reset
-          </button>
+    <div className="flex flex-col h-full p-4 bg-gray-50">
+      <h1 className="text-2xl font-bold text-gray-800 mb-4">Energy Dashboard</h1>
+      
+      {/* Real-time Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-gray-600 font-medium mb-2">Current Power</h3>
+          <p className={`text-3xl font-bold ${
+            powerData.power > 1000 ? 'text-red-500' : 
+            powerData.power > 500 ? 'text-yellow-500' : 'text-green-500'
+          }`}>
+            {powerData.power} W
+          </p>
         </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-gray-600 font-medium mb-2">Minute Cost</h3>
+          <p className="text-3xl font-bold text-purple-500">
+            ${powerData.minuteCost.toFixed(4)}
+          </p>
+        </div>
+      </div>
 
-        {!isConnected && !powerData.isInitialData ? (
-          <div className="text-center py-4 text-yellow-400">
-            Connecting to devices...
-          </div>
-        ) : (
-          <>
-            <div className={`text-4xl font-bold mb-2 ${getPowerColor(powerData.power)}`}>
-              {powerData.power} <span className="text-xl">W</span>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 my-4">
-              <div className={`bg-gray-700 p-3 rounded-lg ${getEnergyColor(powerData.energy)}`}>
-                <div className="text-gray-400 text-sm">Today's Usage</div>
-                <div className="text-xl">{powerData.energy.toFixed(2)} Wh</div>
+      {/* Daily Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-gray-600 font-medium mb-2">Today's Energy</h3>
+          <p className="text-2xl font-bold text-blue-500">
+            {powerData.energy.toFixed(2)} Wh
+          </p>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-gray-600 font-medium mb-2">Today's Cost</h3>
+          <p className="text-2xl font-bold text-green-500">
+            ${powerData.cost.toFixed(2)}
+          </p>
+        </div>
+        
+        <div className="bg-white p-4 rounded-lg shadow">
+          <h3 className="text-gray-600 font-medium mb-2">Peak Power</h3>
+          <p className="text-2xl font-bold text-orange-500">
+            {powerData.peak} W
+          </p>
+        </div>
+      </div>
+
+      {/* Device Status */}
+      <div className="bg-white rounded-lg shadow p-4 mb-4 flex-1 overflow-y-auto">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Device Status</h2>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Device</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Power</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {powerData.devices.map((device, index) => (
+                <tr key={index}>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {device.name}
+                  </td>
+                  <td className={`px-4 py-2 whitespace-nowrap text-sm font-medium ${
+                    device.state === 'ON' ? 'text-green-600' :
+                    device.state === 'OFF' ? 'text-red-600' : 'text-yellow-600'
+                  }`}>
+                    {device.state}
+                  </td>
+                  <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
+                    {device.power} W
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Device Counts */}
+      <div className="bg-white rounded-lg shadow p-4">
+        <h2 className="text-xl font-semibold text-gray-800 mb-4">Device Inventory</h2>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          {Object.entries(powerData.deviceCounts)
+            .filter(([_, count]) => count > 0)
+            .map(([device, count]) => (
+              <div key={device} className="bg-gray-50 p-3 rounded-lg">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm font-medium text-gray-700 capitalize">
+                    {device.replace(/([A-Z])/g, ' $1').trim()}
+                  </span>
+                  <span className={`px-2 py-1 rounded-full text-xs font-bold ${
+                    (powerData.activeDevices[device] || 0) > 0 ? 
+                    'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {powerData.activeDevices[device] || 0}/{count} active
+                  </span>
+                </div>
               </div>
-              <div className="bg-gray-700 p-3 rounded-lg">
-                <div className="text-gray-400 text-sm">Cost</div>
-                <div className="text-xl">${powerData.cost.toFixed(2)}</div>
-              </div>
-            </div>
-            
-            <div className="bg-gray-700 p-3 rounded-lg mb-4">
-              <div className="text-gray-400 text-sm">Peak Power Today</div>
-              <div className="text-xl">{powerData.peak} W</div>
-            </div>
-            
-            <div className="text-xs text-gray-400">
-              Updated: {powerData.lastUpdate}
-              {!isConnected && powerData.isInitialData && (
-                <span className="text-yellow-400 ml-2">(Using cached data)</span>
-              )}
-            </div>
-          </>
-        )}
+            ))}
+        </div>
+      </div>
+
+      <div className="mt-4 text-right text-sm text-gray-500">
+        Last updated: {powerData.lastUpdate}
       </div>
     </div>
   );
 }
-
-export default Dashboard;
