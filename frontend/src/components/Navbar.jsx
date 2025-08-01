@@ -1,32 +1,35 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect } from "react";
 
 function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [activeItem, setActiveItem] = useState('home');
+  const [activeItem, setActiveItem] = useState("home");
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 20);
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    window.addEventListener("scroll", handleScroll);
+    return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
   const navItems = [
-    { id: 'home', label: 'Home', href: '/' },
-    { id: 'dashboard', label: 'Dashboard', href: '/Dashboard' },
-    { id: 'metaverse', label: 'Metaverse', href: '/Homemeta' },
-    { id: 'analytics', label: 'Analytics', href: '/analytics' }
+    { id: "home", label: "Home", href: "/" },
+    { id: "dashboard", label: "Dashboard", href: "/Dashboard" },
+    { id: "metaverse", label: "Metaverse", href: "/Homemeta" },
+    { id: "analytics", label: "Analytics", href: "/analytics" },
+    { id: "assistant", label: "Assistant", href: "/assistant" },
   ];
 
   return (
-    <nav className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
-      isScrolled 
-        ? 'bg-slate-900/80 backdrop-blur-xl' 
-        : 'bg-slate-900/80 backdrop-blur-xl border-b border-0'
-    }`}>
+    <nav
+      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
+        isScrolled
+          ? "bg-slate-900/80 backdrop-blur-xl"
+          : "bg-slate-900/80 backdrop-blur-xl border-b border-0"
+      }`}
+    >
       <div className="max-w-7xl mx-auto px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -52,8 +55,8 @@ function Navbar() {
                 href={item.href}
                 className={`relative px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
                   activeItem === item.id
-                    ? 'text-white bg-white/10 backdrop-blur-sm'
-                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                    ? "text-white bg-white/10 backdrop-blur-sm"
+                    : "text-gray-300 hover:text-white hover:bg-white/5"
                 }`}
                 onClick={() => setActiveItem(item.id)}
               >
@@ -88,19 +91,33 @@ function Navbar() {
             onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           >
             <div className="w-6 h-6 flex flex-col justify-center items-center">
-              <span className={`block w-5 h-0.5 bg-white transition-all duration-200 ${isMobileMenuOpen ? 'rotate-45 translate-y-1' : ''}`}></span>
-              <span className={`block w-5 h-0.5 bg-white mt-1 transition-all duration-200 ${isMobileMenuOpen ? 'opacity-0' : ''}`}></span>
-              <span className={`block w-5 h-0.5 bg-white mt-1 transition-all duration-200 ${isMobileMenuOpen ? '-rotate-45 -translate-y-1' : ''}`}></span>
+              <span
+                className={`block w-5 h-0.5 bg-white transition-all duration-200 ${
+                  isMobileMenuOpen ? "rotate-45 translate-y-1" : ""
+                }`}
+              ></span>
+              <span
+                className={`block w-5 h-0.5 bg-white mt-1 transition-all duration-200 ${
+                  isMobileMenuOpen ? "opacity-0" : ""
+                }`}
+              ></span>
+              <span
+                className={`block w-5 h-0.5 bg-white mt-1 transition-all duration-200 ${
+                  isMobileMenuOpen ? "-rotate-45 -translate-y-1" : ""
+                }`}
+              ></span>
             </div>
           </button>
         </div>
 
         {/* Mobile Menu */}
-        <div className={`md:hidden transition-all duration-300 ease-in-out ${
-          isMobileMenuOpen 
-            ? 'max-h-96 opacity-100' 
-            : 'max-h-0 opacity-0 overflow-hidden'
-        }`}>
+        <div
+          className={`md:hidden transition-all duration-300 ease-in-out ${
+            isMobileMenuOpen
+              ? "max-h-96 opacity-100"
+              : "max-h-0 opacity-0 overflow-hidden"
+          }`}
+        >
           <div className="py-4 space-y-2 bg-slate-900/90 backdrop-blur-xl rounded-2xl mt-2 border border-white/10">
             {navItems.map((item) => (
               <a
@@ -108,8 +125,8 @@ function Navbar() {
                 href={item.href}
                 className={`block px-6 py-3 text-sm font-medium transition-colors duration-200 ${
                   activeItem === item.id
-                    ? 'text-white bg-white/10'
-                    : 'text-gray-300 hover:text-white hover:bg-white/5'
+                    ? "text-white bg-white/10"
+                    : "text-gray-300 hover:text-white hover:bg-white/5"
                 }`}
                 onClick={() => {
                   setActiveItem(item.id);

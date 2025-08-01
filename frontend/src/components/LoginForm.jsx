@@ -1,42 +1,44 @@
-import { useState } from 'react'
-import { Mail, Lock, Eye, EyeOff, Sparkles, User } from 'lucide-react'
+import { useState } from "react";
+import { Mail, Lock, Eye, EyeOff, Sparkles, User } from "lucide-react";
 
 function LoginForm() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [error, setError] = useState('')
-  const [showPassword, setShowPassword] = useState(false)
-  const [isLoading, setIsLoading] = useState(false)
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
   const handleSubmit = async (e) => {
-    e.preventDefault()
-    setIsLoading(true)
-    setError('')
-    
+    e.preventDefault();
+    setIsLoading(true);
+    setError("");
+
     try {
       // Replace with your actual axios import and usage
-      const response = await fetch('http://localhost:5000/api/auth/login', {
-        method: 'POST',
+      const response = await fetch("http://localhost:5000/api/auth/login", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify({ email, password })
-      })
-      
-      const data = await response.json()
-      
+        body: JSON.stringify({ email, password }),
+      });
+
+      const data = await response.json();
+
       if (response.ok) {
-        localStorage.setItem('token', data.token)
-        window.location.href = '/'
+        localStorage.setItem("token", data.token);
+        localStorage.setItem("userId", data.user.id); 
+        console.log(data.user.id)
+        window.location.href = "/";
       } else {
-        setError('Invalid credentials')
+        setError("Invalid credentials");
       }
     } catch {
-      setError('Invalid credentials')
+      setError("Invalid credentials");
     } finally {
-      setIsLoading(false)
+      setIsLoading(false);
     }
-  }
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden flex items-center justify-center p-4">
@@ -49,13 +51,16 @@ function LoginForm() {
 
       {/* Grid Pattern Overlay */}
       <div className="absolute inset-0 opacity-10">
-        <div className="w-full h-full" style={{
-          backgroundImage: `
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
             linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px),
             linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)
           `,
-          backgroundSize: '50px 50px'
-        }}></div>
+            backgroundSize: "50px 50px",
+          }}
+        ></div>
       </div>
 
       <div className="relative z-10 w-full max-w-md">
@@ -81,7 +86,7 @@ function LoginForm() {
               <User className="w-8 h-8 text-white" />
             </div>
           </div>
-          
+
           <h2 className="text-2xl font-bold text-white text-center mb-8">
             Welcome Back
           </h2>
@@ -125,7 +130,11 @@ function LoginForm() {
                   onClick={() => setShowPassword(!showPassword)}
                   className="absolute right-4 top-1/2 transform -translate-y-1/2 text-white/50 hover:text-white transition-colors"
                 >
-                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                  {showPassword ? (
+                    <EyeOff className="w-5 h-5" />
+                  ) : (
+                    <Eye className="w-5 h-5" />
+                  )}
                 </button>
               </div>
             </div>
@@ -133,7 +142,9 @@ function LoginForm() {
             {/* Error Message */}
             {error && (
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl">
-                <p className="text-red-400 text-sm font-medium text-center">{error}</p>
+                <p className="text-red-400 text-sm font-medium text-center">
+                  {error}
+                </p>
               </div>
             )}
 
@@ -142,9 +153,9 @@ function LoginForm() {
               type="submit"
               disabled={isLoading}
               className={`w-full py-4 px-6 rounded-2xl font-semibold text-white transition-all duration-300 transform ${
-                isLoading 
-                  ? 'bg-gray-600 cursor-not-allowed' 
-                  : 'bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 hover:scale-105 shadow-lg hover:shadow-xl'
+                isLoading
+                  ? "bg-gray-600 cursor-not-allowed"
+                  : "bg-gradient-to-r from-cyan-500 to-purple-600 hover:from-cyan-600 hover:to-purple-700 hover:scale-105 shadow-lg hover:shadow-xl"
               }`}
             >
               {isLoading ? (
@@ -153,7 +164,7 @@ function LoginForm() {
                   Logging in...
                 </div>
               ) : (
-                'Login to Metaverse'
+                "Login to Metaverse"
               )}
             </button>
           </form>
@@ -161,7 +172,7 @@ function LoginForm() {
           {/* Footer Links */}
           <div className="mt-8 text-center">
             <p className="text-white/60 text-sm">
-              Don't have an account?{' '}
+              Don't have an account?{" "}
               <button className="text-cyan-400 hover:text-cyan-300 font-medium transition-colors">
                 Sign up here
               </button>
@@ -177,7 +188,7 @@ function LoginForm() {
         </div>
       </div>
     </div>
-  )
+  );
 }
 
-export default LoginForm
+export default LoginForm;
