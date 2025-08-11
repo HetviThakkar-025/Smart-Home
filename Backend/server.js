@@ -9,6 +9,7 @@ const quoteRoutes = require("./routes/quoteRoutes");
 const weatherRoutes = require("./routes/weather");
 const focusRoutes = require("./routes/focus");
 const newsRoute = require("./routes/news");
+const petCareRoutes = require("./routes/petCare");
 
 dotenv.config();
 console.log("Loaded GNEWS_API_KEY:", process.env.GNEWS_API_KEY);
@@ -32,6 +33,7 @@ app.use("/api/quotes", quoteRoutes);
 app.use("/api/weather", weatherRoutes);
 app.use("/api/focus", focusRoutes);
 app.use("/api/news", newsRoute);
+app.use("/api/petcare", petCareRoutes);
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => console.log(`Server running on port ${PORT}`));

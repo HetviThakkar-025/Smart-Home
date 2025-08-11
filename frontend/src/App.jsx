@@ -15,6 +15,7 @@ import AnalyticsPage from "./pages/AnalyticsPage";
 import SmartAssistant from "./pages/SmartAssistant";
 import NotesWall from "./pages/NotesWall";
 import MorningBrief from "./pages/MorningBrief";
+import PetCare from "./pages/PetCare";
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
@@ -50,6 +51,7 @@ function App() {
           <Route path="/assistant" element={<SmartAssistant />} />
           <Route path="/assistant/notes" element={<NotesWall />} />
           <Route path="/assistant/morning-brief" element={<MorningBrief />} />
+          <Route path="/assistant/pet" element={<PetCare />} />
         </Routes>
       </div>
       <Footer />

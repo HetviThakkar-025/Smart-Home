@@ -4,8 +4,9 @@ backend/node_modules/
 */node_modules/
 
 # Python virtual environments
-fastapi-services/venv/
+fastapi-service/venv/
 */venv/
+fastapi-service/pet_comfort_model.pkl
 
 # Python cache
 __pycache__/
@@ -18,3 +19,4 @@ __pycache__/
 .DS_Store
 
 **/.env
+
