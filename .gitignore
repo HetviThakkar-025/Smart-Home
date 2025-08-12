@@ -7,6 +7,8 @@ backend/node_modules/
 fastapi-service/venv/
 */venv/
 fastapi-service/pet_comfort_model.pkl
+fastapi-service/pet_health_model.pkl
+fastapi-service/pet_diet_model.pkl
 
 # Python cache
 __pycache__/

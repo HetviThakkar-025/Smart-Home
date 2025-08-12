@@ -46,35 +46,7 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-module.exports = router;
-
-// -----------------------------
-// Pet Comfort Prediction
-// -----------------------------
-// router.post("/predict-comfort", async (req, res) => {
-//   try {
-//     const { temperature, humidity, feeding_interval, activity_level } =
-//       req.body;
-
-//     const response = await axios.post(
-//       "http://localhost:8001/predict_pet_comfort",
-//       {
-//         temperature,
-//         humidity,
-//         feeding_interval,
-//         activity_level,
-//       }
-//     );
-
-//     res.json({
-//       comfort_level: response.data.comfort_level,
-//     });
-//   } catch (error) {
-//     console.error("Error predicting pet comfort:", error.message);
-//     res.status(500).json({ error: "Failed to predict comfort" });
-//   }
-// });
-
+// 1. Pet Comfort Prediction
 router.post("/predict-comfort", authenticate, async (req, res) => {
   try {
     const { temperature, humidity, feeding_interval, activity_level } =
@@ -89,6 +61,42 @@ router.post("/predict-comfort", authenticate, async (req, res) => {
   } catch (error) {
     console.error("Error predicting pet comfort:", error.message);
     res.status(500).json({ error: "Failed to predict comfort" });
+  }
+});
+
+// 2. Pet Health Anomaly Detection
+router.post("/predict-health", async (req, res) => {
+  try {
+    const { symptoms, recentFood, recentActivity } = req.body;
+
+    const response = await axios.post(
+      "http://localhost:8001/predict_pet_health",
+      { symptoms, recentFood, recentActivity }
+    );
+
+    console.log(response.data.risk);
+    res.json({ risk: response.data.risk });
+  } catch (error) {
+    console.error("Error predicting pet health:", error.message);
+    res.status(500).json({ error: "Failed to predict pet health" });
+  }
+});
+
+// 3. Pet Diet Personalization
+router.post("/recommend-diet", async (req, res) => {
+  try {
+    const { breed, weight, activity } = req.body;
+
+    const response = await axios.post(
+      "http://localhost:8001/recommend_pet_diet",
+      { breed, weight, activity }
+    );
+
+    console.log(response.data);
+    res.json({ recommendation: response.data });
+  } catch (error) {
+    console.error("Error recommending diet:", error.message);
+    res.status(500).json({ error: "Failed to recommend diet" });
   }
 });
 
