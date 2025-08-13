@@ -16,6 +16,7 @@ import SmartAssistant from "./pages/SmartAssistant";
 import NotesWall from "./pages/NotesWall";
 import MorningBrief from "./pages/MorningBrief";
 import PetCare from "./pages/PetCare";
+import SmartKitchen from "./pages/SmartKitchen";
 
 function App() {
   const [deviceStates, setDeviceStates] = useState({});
@@ -52,6 +53,7 @@ function App() {
           <Route path="/assistant/notes" element={<NotesWall />} />
           <Route path="/assistant/morning-brief" element={<MorningBrief />} />
           <Route path="/assistant/pet" element={<PetCare />} />
+          <Route path="/assistant/smart-kitchen" element={<SmartKitchen />} />
         </Routes>
       </div>
       <Footer />

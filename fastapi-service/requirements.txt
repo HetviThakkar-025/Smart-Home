@@ -4,3 +4,7 @@ pandas
 scikit-learn
 sentence-transformers
 joblib
+openai
+python-dotenv
+numpy
+pydantic

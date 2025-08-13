@@ -5,6 +5,7 @@ backend/node_modules/
 
 # Python virtual environments
 fastapi-service/venv/
+fastapi-service/.venv/
 */venv/
 fastapi-service/pet_comfort_model.pkl
 fastapi-service/pet_health_model.pkl

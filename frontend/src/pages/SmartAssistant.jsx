@@ -11,11 +11,11 @@ export default function SmartAssistant() {
       side: "right",
     },
     {
-      id: "visitor-log",
-      title: "🛡 Visitor Recognition & Log",
-      description: "Identify visitors & keep secure visitor history.",
-      link: "/assistant/visitor-log",
-      tooltip: "See who visited today!",
+      id: "smart-kitchen",
+      title: "🍳 AI Smart Kitchen",
+      description: "AI recipes, nutrition tracking & meal planning.",
+      link: "/assistant/smart-kitchen",
+      tooltip: "Cook smarter, eat healthier!",
       side: "left",
     },
     {

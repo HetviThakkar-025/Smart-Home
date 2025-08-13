@@ -313,7 +313,7 @@ export default function PetCareAssistant() {
           />
           <input
             className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Recent food intake (e.g., Chicken - 50g)"
+            placeholder="Recent food intake (e.g., Biscuits - 50g)"
             value={recentFood}
             onChange={(e) => setRecentFood(e.target.value)}
           />
