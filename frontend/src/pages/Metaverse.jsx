@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import Dashboard from "./Dashboard";
+import toast, { Toaster } from 'react-hot-toast';
 
 const deviceIcons = {
   light: "💡",
@@ -13,7 +14,7 @@ const deviceIcons = {
   table: "🪑",
   carpet: "🧶",
   bed: "🛏️",
-  sofa: "🛋️"
+  sofa: "🛋️",
 };
 
 const deviceLabels = {
@@ -28,13 +29,28 @@ const deviceLabels = {
   table: "Table",
   carpet: "Carpet",
   bed: "Bed",
-  sofa: "Sofa"
+  sofa: "Sofa",
+};
+
+const ALERT_THRESHOLDS = {
+  DAILY_COST: 30, // ₹50 per day
+  POWER_CONSUMPTION: 1200, // 1200W
 };
 
 function Metaverse() {
   const [showDashboard, setShowDashboard] = useState(false);
   const [gameLoaded, setGameLoaded] = useState(false);
-  const [activeDevices, setActiveDevices] = useState({});
+  const [powerData, setPowerData] = useState({
+    power: 0,
+    energy: 0,
+    cost: 0,
+    peak: 0,
+    devices: [],
+    timestamp: "",
+  });
+  const [gameInstance, setGameInstance] = useState(null);
+  const [costAlertShown, setCostAlertShown] = useState(false);
+  const [powerAlertShown, setPowerAlertShown] = useState(false);
 
   useEffect(() => {
     const iframe = document.createElement("iframe");
@@ -42,7 +58,6 @@ function Metaverse() {
     iframe.style.width = "100%";
     iframe.style.height = "100%";
     iframe.style.border = "none";
-    iframe.style.display = "block";
 
     const container = document.getElementById("game-wrapper");
     container.innerHTML = "";
@@ -52,24 +67,86 @@ function Metaverse() {
       if (event.data?.type === "GAME_LOADED") {
         setGameLoaded(true);
       } else if (event.data?.type === "POWER_UPDATE") {
-        setActiveDevices(event.data.payload.activeDevices || {});
+        setPowerData(event.data.payload);
+        checkAlerts(event.data.payload);
+        sendToBackend(event.data.payload);
       }
     };
 
-    window.addEventListener('message', handleMessage);
-    return () => window.removeEventListener('message', handleMessage);
+    window.addEventListener("message", handleMessage);
+    return () => window.removeEventListener("message", handleMessage);
   }, []);
 
-  const sendDeviceToPhaser = (device) => {
-    const iframe = document.querySelector("iframe");
-    if (iframe && iframe.contentWindow) {
-      iframe.contentWindow.postMessage({ type: "ADD_DEVICE", device }, "*");
+  const checkAlerts = (data) => {
+    // Check daily cost threshold
+    if (data.cost >= ALERT_THRESHOLDS.DAILY_COST && !costAlertShown) {
+      toast.error(
+        `High electricity bill! Daily cost reached ₹${data.cost.toFixed(2)}`,
+        {
+          duration: 6000,
+          style: {
+            background: '#f56565',
+            color: '#fff',
+          },
+          icon: '💰',
+        }
+      );
+      setCostAlertShown(true);
+    } else if (data.cost < ALERT_THRESHOLDS.DAILY_COST * 0.9) {
+      setCostAlertShown(false);
     }
+
+    // Check power consumption threshold
+    if (data.power >= ALERT_THRESHOLDS.POWER_CONSUMPTION && !powerAlertShown) {
+      toast.error(
+        `High power usage! ${data.power}W consumed`,
+        {
+          duration: 6000,
+          style: {
+            background: '#ed8936',
+            color: '#fff',
+          },
+          icon: '⚠️',
+        }
+      );
+      setPowerAlertShown(true);
+    } else if (data.power < ALERT_THRESHOLDS.POWER_CONSUMPTION * 0.9) {
+      setPowerAlertShown(false);
+    }
+  };
+
+  const sendToBackend = async (data) => {
+    try {
+      const response = await fetch("/api/power", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(data),
+      });
+      if (!response.ok) {
+        console.error("Failed to save power data");
+      }
+    } catch (error) {
+      console.error("Error sending data to backend:", error);
+    }
+  };
+
+  const sendDeviceToPhaser = (device) => {
+    document
+      .querySelector("iframe")
+      ?.contentWindow?.postMessage({ type: "ADD_DEVICE", device }, "*");
+  };
+
+  const toggleDashboard = () => {
+    setShowDashboard(!showDashboard);
   };
 
   return (
     <div className="flex h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 pt-16">
-      {/* Sidebar Menu */}
+      <Toaster position="bottom-right" />
+      
+      {/* Device Sidebar */}
       <div className="w-64 bg-gradient-to-b from-gray-800 to-gray-900 text-white p-6 shadow-2xl border-r border-gray-700 overflow-y-auto">
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-2 text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
@@ -77,84 +154,115 @@ function Metaverse() {
           </h2>
           <div className="w-full h-0.5 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full"></div>
         </div>
-        
-        {/* Active Devices Summary */}
-        <div className="mb-6 p-4 bg-gray-700 rounded-lg">
-          <h3 className="text-lg font-semibold mb-2">Active Devices</h3>
-          {Object.keys(activeDevices).filter(key => activeDevices[key] > 0).length > 0 ? (
-            <ul className="space-y-1">
-              {Object.entries(activeDevices)
-                .filter(([_, count]) => count > 0)
-                .map(([device, count]) => (
-                  <li key={device} className="flex justify-between items-center">
-                    <span className="text-sm">{deviceLabels[device] || device}</span>
-                    <span className="bg-blue-500 text-white text-xs font-bold px-2 py-1 rounded-full">
-                      {count}
-                    </span>
-                  </li>
-                ))}
-            </ul>
-          ) : (
-            <p className="text-gray-400 text-sm">No active devices</p>
-          )}
-        </div>
 
-        {/* Device Buttons */}
         <div className="space-y-4">
           {Object.keys(deviceIcons).map((device) => (
             <button
               key={device}
-              className="group w-full bg-gradient-to-r from-gray-700 to-gray-600 hover:from-blue-600 hover:to-purple-600 p-4 rounded-xl shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 ease-in-out border border-gray-600 hover:border-blue-500 relative overflow-hidden"
+              className={`group w-full p-4 rounded-xl shadow-lg transform transition-all duration-300 ease-in-out border bg-gradient-to-r from-gray-700 to-gray-600 border-gray-600 hover:from-blue-600 hover:to-purple-600 hover:border-blue-500`}
               onClick={() => sendDeviceToPhaser(device)}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-500/0 to-purple-500/0 group-hover:from-blue-500/20 group-hover:to-purple-500/20 rounded-xl transition-all duration-300"></div>
               <div className="relative flex items-center justify-center space-x-3">
                 <span className="text-2xl group-hover:scale-110 transition-transform duration-300">
                   {deviceIcons[device]}
                 </span>
                 <span className="font-semibold text-lg group-hover:text-white transition-colors duration-300">
-                  Add {deviceLabels[device] || device}
+                  {deviceLabels[device] || device}
                 </span>
               </div>
-              <div className="absolute inset-0 rounded-xl shadow-inner"></div>
             </button>
           ))}
         </div>
 
-        {/* Dashboard Toggle */}
         <div className="mt-8 pt-6 border-t border-gray-700">
           <button
-            onClick={() => setShowDashboard(!showDashboard)}
-            className="w-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 text-white font-semibold py-2 px-4 rounded-lg shadow-lg transition-all duration-300"
+            onClick={toggleDashboard}
+            className={`w-full ${
+              showDashboard
+                ? "bg-gradient-to-r from-purple-600 to-blue-600"
+                : "bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+            } text-white font-semibold py-3 px-4 rounded-lg shadow-lg transition-all duration-300 flex items-center justify-center`}
           >
-            {showDashboard ? 'Hide Dashboard' : 'Show Dashboard'}
+            {showDashboard ? "Hide Dashboard" : "Show Dashboard"}
           </button>
         </div>
       </div>
 
-      {/* Game Container */}
+      {/* Main Game Area */}
       <div className="flex-1 relative">
-        <div 
-          id="game-wrapper" 
+        <div
+          id="game-wrapper"
           className="w-full h-full bg-gray-900 rounded-l-lg shadow-2xl border-l border-gray-700 relative overflow-hidden"
         >
           {!gameLoaded && (
-            <div className="absolute inset-0 bg-gradient-to-br from-gray-800 to-gray-900 flex items-center justify-center">
+            <div className="absolute inset-0 flex items-center justify-center bg-gray-900">
               <div className="text-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-                <p className="text-gray-400">Loading Metaverse...</p>
+                <p className="text-gray-400">
+                  Loading Smart Home Simulation...
+                </p>
               </div>
             </div>
           )}
         </div>
-        
-        {/* Dashboard Panel */}
+
+        {/* Dashboard Panel - Maintained exact dimensions (1000x720) */}
         {showDashboard && (
-          <div className="absolute top-0 right-0 w-full md:w-1/3 lg:w-1/4 h-full bg-gray-50 shadow-xl z-10 overflow-y-auto p-4 border-l border-gray-200">
-            <Dashboard />
+          <div className="fixed top-16 right-4 w-[1000px] h-[720px] bg-gradient-to-b from-gray-800 to-gray-900 shadow-2xl z-20 border-2 border-gray-600 rounded-[24px] flex flex-col overflow-hidden">
+            {/* Dashboard Header */}
+            <div className="sticky top-0 bg-gradient-to-r from-gray-800 to-gray-700 p-4 border-b border-gray-600 z-10 rounded-t-[24px]">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+                  <h3 className="text-lg font-bold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-purple-500">
+                    Power Dashboard
+                  </h3>
+                </div>
+                <button
+                  onClick={toggleDashboard}
+                  className="bg-red-500 hover:bg-red-600 text-white p-2 rounded-full transition-colors duration-200 shadow-lg"
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            {/* Scrollable Dashboard Content */}
+            <div className="flex-1 overflow-y-auto custom-scrollbar">
+              <Dashboard powerData={powerData} deviceLabels={deviceLabels} />
+            </div>
           </div>
         )}
       </div>
+
+      {/* Custom Scrollbar Styles */}
+      <style jsx>{`
+        .custom-scrollbar::-webkit-scrollbar {
+          width: 8px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+          background: #2d3748;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+          background: #4a5568;
+          border-radius: 4px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+          background: #718096;
+        }
+      `}</style>
     </div>
   );
 }

@@ -2,21 +2,20 @@ import Phaser from "phaser";
 
 const POWER_CONFIG = {
   devices: {
-    light: { wattage: 60, type: "light", label: "Tube Light" },
-    fan: { wattage: 75, type: "fan", label: "Fan" },
-    tv: { wattage: 100, type: "appliance", label: "TV" },
-    oven: { wattage: 1200, type: "appliance", label: "Oven" },
+    light: { wattage: 40, type: "light", label: "Tube Light" }, // Common LED tube light wattage
+    fan: { wattage: 75, type: "fan", label: "Fan" }, // Standard ceiling fan wattage
+    tv: { wattage: 75, type: "appliance", label: "TV" }, // Modern LED TV wattage
+    oven: { wattage: 1000, type: "appliance", label: "Microwave Oven" }, // Typical microwave oven wattage
     fridge: {
-      wattage: 150,
+      wattage: 150, // Average running wattage, as it cycles
       type: "appliance",
-      alwaysOn: true,
-      dutyCycle: 0.7,
+      alwaysOn: true, // Runs 50% of the time
       label: "Fridge",
     },
-    mirror: { wattage: 10, type: "light", label: "Mirror Light" },
-    chimney: { wattage: 50, type: "fan", label: "Chimney" },
+    mirror: { wattage: 10, type: "light", label: "Mirror Light" }, // Low wattage light
+    chimney: { wattage: 200, type: "fan", label: "Kitchen Chimney" }, // Typical kitchen chimney wattage
     washingmachine: {
-      wattage: 500,
+      wattage: 500, // Common washing machine wattage
       type: "appliance",
       label: "Washing Machine",
     },
@@ -25,9 +24,9 @@ const POWER_CONFIG = {
     bed: { wattage: 0, type: "furniture", label: "Bed" },
     sofa: { wattage: 0, type: "furniture", label: "Sofa" },
   },
-  electricityRate: 0.15,
-  updateInterval: 1000, // 1 second updates
-  minuteInterval: 60000, // 1 minute updates
+  electricityRate: 6.0, // ₹6 per kWh (typical Indian residential electricity rate)
+  updateInterval: 1000, // Update every second
+  minuteInterval: 60000, // Save every minute
 };
 
 class SmartHomeScene extends Phaser.Scene {
@@ -35,14 +34,16 @@ class SmartHomeScene extends Phaser.Scene {
     super("SmartHomeScene");
     this.devices = [];
     this.lamps = [];
-    this.instantPower = 0;
-    this.dailyEnergy = 0;
-    this.dailyCost = 0;
-    this.peakPower = 0;
-    this.minuteCost = 0;
+    this.deviceLabels = [];
+    this.instantPower = 0; // Watts
+    this.dailyEnergy = 0; // kWh
+    this.dailyCost = 0; // ₹
+    this.peakPower = 0; // Watts
     this.lastUpdateTime = Date.now();
-    this.deviceCounts = {};
-    this.activeDevices = {};
+    this.lastSavedTime = 0;
+    this.gameStateKey = "smartHomeFullState_v4";
+    this.fridgeCycleState = false; // Track fridge on/off cycle
+    this.fridgeCycleTimer = 0;
   }
 
   preload() {
@@ -59,62 +60,11 @@ class SmartHomeScene extends Phaser.Scene {
   }
 
   create() {
-    // Initialize device counts
-    Object.keys(POWER_CONFIG.devices).forEach((device) => {
-      this.deviceCounts[device] = 0;
-      this.activeDevices[device] = 0;
-    });
-
-    // Load saved data
-    this.loadSavedData();
-
-    // Setup game world
     this.setupGameWorld();
-
-    // Setup power meter
-    this.setupPowerUI();
-
-    // Setup device interactions
     this.setupDeviceInteractions();
-
-    // Start monitoring
+    this.loadFullState();
     this.startPowerMonitoring();
     window.dispatchEvent(new Event("gameLoaded"));
-  }
-
-  loadSavedData() {
-    const savedPowerData = localStorage.getItem("powerData");
-    if (savedPowerData) {
-      try {
-        const { energy, cost, peak, devices } = JSON.parse(savedPowerData);
-        this.dailyEnergy = energy || 0;
-        this.dailyCost = cost || 0;
-        this.peakPower = peak || 0;
-
-        if (devices) {
-          this.deviceCounts = devices.counts || {};
-          this.activeDevices = devices.active || {};
-        }
-      } catch (e) {
-        console.error("Error loading power data:", e);
-      }
-    }
-
-    const savedDevices = localStorage.getItem("savedDevices");
-    if (savedDevices) {
-      try {
-        JSON.parse(savedDevices).forEach((deviceData) => {
-          this.addDevice(
-            deviceData.key,
-            deviceData.x,
-            deviceData.y,
-            deviceData.state
-          );
-        });
-      } catch (e) {
-        console.error("Error loading saved devices:", e);
-      }
-    }
   }
 
   setupGameWorld() {
@@ -129,7 +79,6 @@ class SmartHomeScene extends Phaser.Scene {
 
     map.layers.forEach((layer) => map.createLayer(layer.name, tilesets));
 
-    // Setup camera
     const zoom = Math.min(
       this.cameras.main.width / map.widthInPixels,
       this.cameras.main.height / map.heightInPixels
@@ -138,7 +87,6 @@ class SmartHomeScene extends Phaser.Scene {
       .setZoom(zoom)
       .centerOn(map.widthInPixels / 2, map.heightInPixels / 2);
 
-    // Create lamps
     this.setupLamps(map);
   }
 
@@ -146,58 +94,16 @@ class SmartHomeScene extends Phaser.Scene {
     const lampLayer = map.getObjectLayer("lamps");
     if (!lampLayer) return;
 
-    const savedLampStates = JSON.parse(
-      localStorage.getItem("lampStates") || "[]"
-    );
-
-    lampLayer.objects.forEach((obj, index) => {
+    lampLayer.objects.forEach((obj) => {
       const lamp = this.add
         .zone(obj.x, obj.y, obj.width, obj.height)
         .setOrigin(0)
         .setInteractive({ useHandCursor: true })
-        .setData({ state: savedLampStates[index] || false, type: "light" });
+        .setData({ state: false, type: "light" });
 
-      const label = this.add
-        .text(obj.x + obj.width / 2, obj.y - 15, "", {
-          fontSize: "14px",
-          fill: "#fff",
-          backgroundColor: "#1a1a1a",
-          padding: { left: 10, right: 10, top: 5, bottom: 5 },
-        })
-        .setOrigin(0.5)
-        .setDepth(1000);
-
-      lamp.setData("label", label);
       lamp.on("pointerdown", () => this.toggleDevice(lamp));
       this.lamps.push(lamp);
-
-      // Initialize label text and style based on saved state
-      this.updateLampLabel(lamp);
     });
-  }
-
-  setupPowerUI() {
-    this.powerText = this.add
-      .text(10, 10, "Power: 0W", {
-        fontFamily: "Arial",
-        fontSize: "16px",
-        color: "#ffffff",
-        backgroundColor: "#000000",
-        padding: { left: 10, right: 10, top: 5, bottom: 5 },
-      })
-      .setScrollFactor(0)
-      .setDepth(1000);
-
-    this.minuteCostText = this.add
-      .text(10, 40, "Minute Cost: $0.00", {
-        fontFamily: "Arial",
-        fontSize: "16px",
-        color: "#ffffff",
-        backgroundColor: "#000000",
-        padding: { left: 10, right: 10, top: 5, bottom: 5 },
-      })
-      .setScrollFactor(0)
-      .setDepth(1000);
   }
 
   setupDeviceInteractions() {
@@ -213,11 +119,6 @@ class SmartHomeScene extends Phaser.Scene {
     const deviceConfig = POWER_CONFIG.devices[deviceKey];
     if (!deviceConfig) return;
 
-    // Update device count
-    this.deviceCounts[deviceKey] = (this.deviceCounts[deviceKey] || 0) + 1;
-    if (initialState)
-      this.activeDevices[deviceKey] = (this.activeDevices[deviceKey] || 0) + 1;
-
     const device = this.add
       .image(x, y, deviceKey)
       .setInteractive({ draggable: true })
@@ -229,13 +130,24 @@ class SmartHomeScene extends Phaser.Scene {
         key: deviceKey,
       });
 
+    const label = this.add.text(x, y + 40, `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`, {
+      fontFamily: 'Arial',
+      fontSize: '14px',
+      color: '#ffffff',
+      backgroundColor: '#000000',
+      padding: { x: 5, y: 2 }
+    })
+    .setOrigin(0.5)
+    .setDepth(1000);
+
+    this.deviceLabels.push({ device, label });
     this.setupDeviceControls(device, deviceKey, deviceConfig);
     this.devices.push(device);
     this.updatePowerConsumption();
+    this.saveFullState();
   }
 
   setupDeviceControls(device, deviceKey, deviceConfig) {
-    // Delete button
     const deleteBtn = this.add
       .text(device.x + 30, device.y - 30, "✕", {
         fontFamily: "Arial",
@@ -243,15 +155,12 @@ class SmartHomeScene extends Phaser.Scene {
         fill: "#ffffff",
         backgroundColor: "#e74c3c",
         padding: { left: 6, right: 6, top: 4, bottom: 4 },
-        stroke: "#c0392b",
-        strokeThickness: 1,
       })
       .setInteractive({ useHandCursor: true })
       .setDepth(1000)
       .setOrigin(0.5)
       .setVisible(false);
 
-    // Double click to show delete button
     let clickCount = 0;
     device.on("pointerdown", () => {
       clickCount++;
@@ -265,95 +174,63 @@ class SmartHomeScene extends Phaser.Scene {
       }
     });
 
-    // Delete device
     deleteBtn.on("pointerdown", (pointer) => {
       pointer.event.stopPropagation();
-      const wasOn = device.getData("state");
-      const deviceKey = device.texture.key;
-
       this.tweens.add({
-        targets: [device, deleteBtn, device.label],
+        targets: [device, deleteBtn],
         alpha: 0,
         scale: 0.8,
         duration: 200,
         onComplete: () => {
+          const labelIndex = this.deviceLabels.findIndex(item => item.device === device);
+          if (labelIndex !== -1) {
+            this.deviceLabels[labelIndex].label.destroy();
+            this.deviceLabels.splice(labelIndex, 1);
+          }
+          
           this.devices = this.devices.filter((d) => d !== device);
-          this.deviceCounts[deviceKey]--;
-          if (wasOn) this.activeDevices[deviceKey]--;
-
-          [device, deleteBtn, device.label].forEach((el) => el && el.destroy());
-          this.saveDevices();
+          [device, deleteBtn].forEach((el) => el && el.destroy());
           this.updatePowerConsumption();
+          this.saveFullState();
         },
       });
     });
 
-    // Drag handling
     device.on("drag", (pointer, dragX, dragY) => {
       device.setPosition(dragX, dragY);
       deleteBtn.setPosition(dragX + 30, dragY - 30);
-      if (device.label) device.label.setPosition(dragX, dragY + 40);
+      
+      const labelObj = this.deviceLabels.find(item => item.device === device);
+      if (labelObj) {
+        labelObj.label.setPosition(dragX, dragY + 40);
+      }
     });
 
-    device.on("dragend", () => this.saveDevices());
+    device.on("pointerup", () => {
+      this.toggleDevice(device);
+    });
 
-    // Device label
-    if (
-      deviceConfig.type === "light" ||
-      deviceConfig.type === "fan" ||
-      deviceConfig.type === "appliance"
-    ) {
-      const labelText = `${deviceConfig.label} ${
-        device.getData("state") ? "ON" : "OFF"
-      }`;
-      device.label = this.add
-        .text(device.x, device.y + 40, labelText, {
-          fontFamily: "Arial",
-          fontSize: "14px",
-          fill: device.getData("state") ? "#00ff41" : "#ffffff",
-          backgroundColor: device.getData("state") ? "#0a2a0a" : "#1a1a1a",
-          padding: { left: 10, right: 10, top: 5, bottom: 5 },
-          stroke: device.getData("state") ? "#00aa00" : "#333333",
-          strokeThickness: 1,
-        })
-        .setOrigin(0.5)
-        .setDepth(1000);
-
-      device.on("pointerup", () => {
-        this.toggleDevice(device);
+    if (deviceConfig.type === "fan" && device.getData("state")) {
+      this.tweens.add({
+        targets: device,
+        angle: 360,
+        duration: 800,
+        repeat: -1,
       });
-
-      if (deviceConfig.type === "fan" && device.getData("state")) {
-        this.tweens.add({
-          targets: device,
-          angle: 360,
-          duration: 800,
-          repeat: -1,
-        });
-      }
     }
   }
 
   toggleDevice(device) {
-    const key = device.texture?.key || "lamp"; // fallback to "lamp" for zones
+    const key = device.texture?.key || "lamp";
     const config = POWER_CONFIG.devices[key] || { label: "Tube Light" };
     const newState = !device.getData("state");
     device.setData("state", newState);
 
-    // Update active count if applicable
-    if (key !== "lamp") {
-      if (newState) this.activeDevices[key]++;
-      else this.activeDevices[key]--;
+    const labelObj = this.deviceLabels.find(item => item.device === device);
+    if (labelObj) {
+      labelObj.label.setText(`${config.label}: ${newState ? "ON" : "OFF"}`);
     }
 
-    // Update label UI
-    if (device.label) {
-      device.label.setText(`${config.label} ${newState ? "ON" : "OFF"}`);
-      device.label.setFill(newState ? "#00ff41" : "#fff");
-      device.label.setBackgroundColor(newState ? "#0a2a0a" : "#1a1a1a");
-    }
-
-    // Handle fan animation
     if (config.type === "fan" && device.texture?.key) {
       if (newState) {
         device.rotation = 0;
@@ -369,167 +246,196 @@ class SmartHomeScene extends Phaser.Scene {
       }
     }
 
-    // Save changes
     this.updatePowerConsumption();
-    this.saveDevices();
-
-    // Save lamp state specifically
-    if (device.getData("type") === "light" && !device.texture?.key) {
-      this.updateLampLabel(device);
-    }
-  }
-  saveLampStates() {
-    const lampStates = this.lamps.map((lamp) => lamp.getData("state"));
-    localStorage.setItem("lampStates", JSON.stringify(lampStates));
+    this.saveFullState();
   }
 
   updatePowerConsumption() {
     const now = Date.now();
-    const timeElapsed = (now - this.lastUpdateTime) / 1000;
+    const timeElapsed = (now - this.lastUpdateTime) / 1000; // in seconds
     this.lastUpdateTime = now;
+
+    // Update fridge cycle (runs 50% of time if alwaysOn)
+    this.fridgeCycleTimer += timeElapsed;
+    if (this.fridgeCycleTimer >= 1800) { // 30 minute cycle
+      this.fridgeCycleTimer = 0;
+      this.fridgeCycleState = !this.fridgeCycleState;
+    }
 
     let totalPower = 0;
     let deviceDetails = [];
 
-    // Calculate from lamps
+    // Calculate power from lamps
     this.lamps.forEach((lamp) => {
-      if (lamp.getData("state")) {
-        totalPower += 60;
-        deviceDetails.push({
-          name: "Lamp",
-          power: 60,
-          state: "ON",
-          type: "light",
-        });
-      } else {
-        deviceDetails.push({
-          name: "Lamp",
-          power: 0,
-          state: "OFF",
-          type: "light",
-        });
-      }
+      const isOn = lamp.getData("state");
+      const power = isOn ? POWER_CONFIG.devices.light.wattage : 0;
+      totalPower += power;
+      deviceDetails.push({
+        name: "Lamp",
+        power,
+        state: isOn ? "ON" : "OFF",
+        type: "light",
+      });
     });
 
-    // Calculate from devices
+    // Calculate power from devices
     this.devices.forEach((device) => {
       const config = POWER_CONFIG.devices[device.texture.key];
       if (!config) return;
 
-      const isOn = device.getData("state") || config.alwaysOn;
-      const devicePower =
-        config.wattage * (config.alwaysOn ? config.dutyCycle : 1);
+      let isOn = device.getData("state");
+      let devicePower = 0;
+      let state = isOn ? "ON" : "OFF";
 
-      if (isOn) totalPower += devicePower;
+      if (config.alwaysOn) {
+        // For always-on devices like fridge
+        isOn = this.fridgeCycleState;
+        devicePower = isOn ? config.wattage : 0;
+        state = isOn ? "RUNNING" : "IDLE";
+      } else {
+        devicePower = isOn ? config.wattage : 0;
+      }
 
+      totalPower += devicePower;
       deviceDetails.push({
         name: config.label,
-        power: isOn ? devicePower : 0,
-        state: isOn ? "ON" : config.alwaysOn ? "AUTO" : "OFF",
+        power: devicePower,
+        state,
         type: config.type,
       });
     });
 
+    // Update power metrics
     this.instantPower = Math.round(totalPower);
     if (totalPower > this.peakPower) this.peakPower = Math.round(totalPower);
 
-    // Update energy and cost
-    const energyIncrement = (totalPower * timeElapsed) / 3600;
+    // Calculate energy consumption (kWh = (Watts × hours) / 1000)
+    const energyIncrement = (totalPower * timeElapsed) / 3600000; // Convert to kWh
     this.dailyEnergy += energyIncrement;
-    this.dailyCost = (this.dailyEnergy / 1000) * POWER_CONFIG.electricityRate;
-    this.minuteCost += (energyIncrement / 1000) * POWER_CONFIG.electricityRate;
+    this.dailyCost = this.dailyEnergy * POWER_CONFIG.electricityRate;
 
-    // Update UI
-    this.updatePowerUI();
-    this.sendToDashboard(deviceDetails);
-
-    // Save state every minute
-    if (now % POWER_CONFIG.minuteInterval < POWER_CONFIG.updateInterval) {
-      this.minuteCost = 0; // Reset minute cost after reporting
-      this.savePowerData();
+    // Save periodically
+    if (now - this.lastSavedTime > POWER_CONFIG.minuteInterval) {
+      this.sendToBackend(deviceDetails);
+      this.lastSavedTime = now;
     }
-  }
 
-  updatePowerUI() {
-    const color =
-      this.instantPower > 1000
-        ? "#ff5555"
-        : this.instantPower > 500
-        ? "#ffaa00"
-        : "#55ff55";
-
-    this.powerText.setText(`Power: ${this.instantPower}W`).setColor(color);
-    this.minuteCostText.setText(`Minute Cost: $${this.minuteCost.toFixed(4)}`);
+    this.saveFullState();
+    this.sendToDashboard(deviceDetails);
   }
 
   startPowerMonitoring() {
-    // Real-time updates
     this.time.addEvent({
       delay: POWER_CONFIG.updateInterval,
       callback: this.updatePowerConsumption,
       callbackScope: this,
       loop: true,
     });
-
-    // Minute updates
-    this.time.addEvent({
-      delay: POWER_CONFIG.minuteInterval,
-      callback: () => {
-        this.minuteCost = 0;
-      },
-      callbackScope: this,
-      loop: true,
-    });
   }
 
-  savePowerData() {
-    localStorage.setItem(
-      "powerData",
-      JSON.stringify({
-        energy: this.dailyEnergy,
-        cost: this.dailyCost,
-        peak: this.peakPower,
-        devices: {
-          counts: this.deviceCounts,
-          active: this.activeDevices,
-        },
-      })
-    );
+  saveFullState() {
+    const state = {
+      devices: this.devices.map(device => ({
+        key: device.texture.key,
+        x: device.x,
+        y: device.y,
+        state: device.getData("state")
+      })),
+      lamps: this.lamps.map(lamp => ({
+        x: lamp.x,
+        y: lamp.y,
+        state: lamp.getData("state")
+      })),
+      instantPower: this.instantPower,
+      dailyEnergy: this.dailyEnergy,
+      dailyCost: this.dailyCost,
+      peakPower: this.peakPower,
+      lastUpdateTime: this.lastUpdateTime,
+      lastSavedTime: this.lastSavedTime
+    };
+
+    localStorage.setItem(this.gameStateKey, JSON.stringify(state));
   }
 
-  saveDevices() {
-    const devices = this.devices.map((device) => ({
-      key: device.texture.key,
-      x: device.x,
-      y: device.y,
-      state: device.getData("state"),
-    }));
-    localStorage.setItem("savedDevices", JSON.stringify(devices));
-    this.savePowerData();
+  loadFullState() {
+    const savedState = localStorage.getItem(this.gameStateKey);
+    if (!savedState) return;
+
+    try {
+      const state = JSON.parse(savedState);
+      
+      if (state.lamps && this.lamps.length > 0) {
+        state.lamps.forEach((savedLamp, index) => {
+          if (this.lamps[index]) {
+            this.lamps[index].setData("state", savedLamp.state);
+          }
+        });
+      }
+
+      if (state.devices) {
+        state.devices.forEach(savedDevice => {
+          this.addDevice(
+            savedDevice.key, 
+            savedDevice.x, 
+            savedDevice.y, 
+            savedDevice.state
+          );
+        });
+      }
+
+      this.instantPower = state.instantPower || 0;
+      this.dailyEnergy = state.dailyEnergy || 0;
+      this.dailyCost = state.dailyCost || 0;
+      this.peakPower = state.peakPower || 0;
+      this.lastUpdateTime = state.lastUpdateTime || Date.now();
+      this.lastSavedTime = state.lastSavedTime || 0;
+
+    } catch (error) {
+      console.error("Error loading game state:", error);
+    }
   }
 
   sendToDashboard(deviceDetails = []) {
     const payload = {
       power: this.instantPower,
-      energy: parseFloat(this.dailyEnergy.toFixed(2)),
+      energy: parseFloat(this.dailyEnergy.toFixed(4)),
       cost: parseFloat(this.dailyCost.toFixed(2)),
       peak: this.peakPower,
-      minuteCost: parseFloat(this.minuteCost.toFixed(4)),
-      lastUpdate: new Date().toLocaleTimeString(),
       devices: deviceDetails,
-      deviceCounts: this.deviceCounts,
-      activeDevices: this.activeDevices,
+      timestamp: new Date().toISOString()
     };
 
-    [window.parent, window].forEach((target) => {
-      target?.postMessage(
-        {
-          type: "POWER_UPDATE",
-          payload,
+    window.parent.postMessage({
+      type: "POWER_UPDATE",
+      payload: payload
+    }, "*");
+  }
+
+  async sendToBackend(deviceDetails) {
+    try {
+      const payload = {
+        power: this.instantPower,
+        energy: parseFloat(this.dailyEnergy.toFixed(4)),
+        cost: parseFloat(this.dailyCost.toFixed(2)),
+        peak: this.peakPower,
+        devices: deviceDetails,
+        timestamp: new Date().toISOString()
+      };
+
+      const response = await fetch('/api/power', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
         },
-        "*"
-      );
-    });
+        body: JSON.stringify(payload)
+      });
+
+      if (!response.ok) {
+        console.error('Failed to save power data:', await response.text());
+      }
+    } catch (error) {
+      console.error('Error sending data to backend:', error);
+    }
   }
 }
 
@@ -540,6 +446,10 @@ const config = {
   parent: "phaser-container",
   scene: SmartHomeScene,
   backgroundColor: "#222",
+  scale: {
+    mode: Phaser.Scale.RESIZE,
+    autoCenter: Phaser.Scale.CENTER_BOTH
+  }
 };
 
 window.addEventListener("load", () => {
