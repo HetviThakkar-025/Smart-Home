@@ -8,10 +8,11 @@ import joblib
 from pydantic import BaseModel
 from fastapi import FastAPI, HTTPException
 import requests
+from meal_scheduler import generate_daily_schedule
 from dotenv import load_dotenv
 load_dotenv()
 SPOONACULAR_API_KEY = os.getenv("SPOONACULAR_API_KEY")
-print(SPOONACULAR_API_KEY)
+# print(SPOONACULAR_API_KEY)
 
 app = FastAPI()
 
@@ -75,6 +76,11 @@ class RecipeRequest(BaseModel):
 
 class NutritionRequest(BaseModel):
     meal: str
+
+
+class MealScheduleRequest(BaseModel):
+    preferences: str = "vegetarian"  # vegetarian / low-carb / high-protein
+    meals_per_day: int = 3
 
 
 @app.post('/predict_urgency')
@@ -282,7 +288,7 @@ def track_nutrition(req: NutritionRequest):
 
     if not SPOONACULAR_API_KEY:
         raise HTTPException(
-            status_code=500, detail="SPOONACULAR_API_KEY not set on server.")
+            status_code=500, detail="SPOONACULAR_API_KEY not set on server")
 
     try:
         # Attempt 1: parseIngredients (preferred)
@@ -382,6 +388,15 @@ def track_nutrition(req: NutritionRequest):
         raise
     except Exception as e:
         print("Unexpected error in /nutrition:", str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/meal-schedule")
+def meal_schedule(req: MealScheduleRequest):
+    try:
+        plan = generate_daily_schedule(req.preferences, req.meals_per_day)
+        return {"schedule": plan["schedule"], "shopping_list": plan["shopping_list"]}
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

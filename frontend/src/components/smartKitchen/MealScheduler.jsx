@@ -5,15 +5,29 @@ import { motion } from "framer-motion";
 export default function MealScheduler() {
   const [preferences, setPreferences] = useState("");
   const [schedule, setSchedule] = useState(null);
+  const [shoppingList, setShoppingList] = useState(null);
 
   const generateSchedule = async () => {
     try {
-      const res = await axios.post("/api/smart-kitchen/meal-schedule", {
-        preferences,
-      });
+      const token = localStorage.getItem("token");
+
+      const res = await axios.post(
+        "/api/smart-kitchen/meal-scheduler",
+        { preferences },
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       setSchedule(res.data.schedule);
+      setShoppingList(res.data.shopping_list);
     } catch (err) {
-      console.error("Error generating meal schedule:", err);
+      console.error(
+        "Error generating meal schedule:",
+        err.response?.data || err.message
+      );
     }
   };
 
@@ -52,12 +66,38 @@ export default function MealScheduler() {
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="mt-4 p-3 bg-[#0f1424] rounded-lg text-gray-300 flex-1"
+          className="mt-4 p-3 bg-[#0f1424] rounded-lg text-gray-300 flex-1 overflow-auto"
         >
           <h3 className="text-lg font-semibold text-yellow-300 mb-2">
-            Your AI Meal Plan:
+            Today's Meal Plan:
           </h3>
-          <pre className="whitespace-pre-wrap">{schedule}</pre>
+          {Object.entries(schedule).map(([day, meals]) => (
+            <div key={day} className="mb-2">
+              <strong className="text-yellow-400">{day}:</strong>
+              <ul className="list-disc pl-5">
+                {meals.map((m, idx) => (
+                  <li key={idx}>
+                    {m.meal} — Ingredients: {m.ingredients.join(", ")}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          {shoppingList && (
+            <>
+              <h3 className="text-lg font-semibold text-yellow-300 mt-4 mb-2">
+                Shopping List:
+              </h3>
+              <ul className="list-disc pl-5">
+                {Object.entries(shoppingList).map(([item, count]) => (
+                  <li key={item}>
+                    {item} {count > 1 ? `x${count}` : ""}
+                  </li>
+                ))}
+              </ul>
+            </>
+          )}
         </motion.div>
       )}
     </motion.div>

@@ -45,16 +45,24 @@ router.post("/nutrition", async (req, res) => {
 // 3️⃣ Meal Scheduler
 router.post("/meal-scheduler", async (req, res) => {
   try {
-    const { preferences } = req.body;
+    const { preferences = "vegetarian" } = req.body;
 
     const response = await axios.post(
-      "http://localhost:8001/meal-scheduler", // Python FastAPI endpoint
-      { preferences }
+      "http://localhost:8001/meal-schedule", // Python FastAPI endpoint
+      { preferences, meals_per_day: 3 }
     );
 
-    res.json({ schedule: response.data.schedule });
+    console.log("Meal schedule response:", response.data);
+    res.json({
+      schedule: response.data.schedule,
+      shopping_list: response.data.shopping_list,
+    });
   } catch (error) {
-    console.error("Error creating meal schedule:", error.message);
+    console.error(
+      "Error creating meal schedule:",
+      error.message,
+      error.response?.data
+    );
     res.status(500).json({ error: "Failed to create meal schedule" });
   }
 });
