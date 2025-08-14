@@ -15,7 +15,7 @@ export default function SmartKitchen() {
   };
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-[#1c1c1c] via-[#0f0f0f] to-[#1c1c1c] py-12 px-6 overflow-hidden">
+    <div className="relative min-h-screen bg-gradient-to-b from-slate-900 via-slate-800 to-slate-900 py-12 px-6 overflow-hidden">
       {/* Floating background kitchen icons */}
       <div className="absolute inset-0 pointer-events-none opacity-5">
         <div className="absolute top-20 left-10 text-8xl">🍳</div>

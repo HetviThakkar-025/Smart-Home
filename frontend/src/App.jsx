@@ -15,6 +15,7 @@ import NotesWall from "./pages/NotesWall";
 import MorningBrief from "./pages/MorningBrief";
 import PetCare from "./pages/PetCare";
 import SmartKitchen from "./pages/SmartKitchen";
+import DecorSense from "./pages/DecorSense";
 
 // Default device labels configuration
 const DEVICE_LABELS = {
@@ -29,7 +30,7 @@ const DEVICE_LABELS = {
   table: "Table",
   carpet: "Carpet",
   bed: "Bed",
-  sofa: "Sofa"
+  sofa: "Sofa",
 };
 
 // Initial power data state
@@ -39,7 +40,7 @@ const INITIAL_POWER_DATA = {
   cost: 0,
   peak: 0,
   devices: [],
-  timestamp: new Date().toISOString()
+  timestamp: new Date().toISOString(),
 };
 
 function App() {
@@ -52,14 +53,14 @@ function App() {
       try {
         if (event.data?.type === "POWER_UPDATE") {
           console.log("Received POWER_UPDATE:", event.data.payload);
-          
+
           const validatedData = validatePowerData(event.data.payload);
-          setPowerData(prev => ({
+          setPowerData((prev) => ({
             ...prev,
             ...validatedData,
-            timestamp: new Date().toISOString()
+            timestamp: new Date().toISOString(),
           }));
-          
+
           sendToBackend(validatedData);
         }
       } catch (error) {
@@ -81,21 +82,21 @@ function App() {
       try {
         setIsSaving(true);
         setBackendError(null);
-        
-        const response = await fetch('/api/power', {
-          method: 'POST',
+
+        const response = await fetch("/api/power", {
+          method: "POST",
           headers: {
-            'Content-Type': 'application/json',
+            "Content-Type": "application/json",
           },
           body: JSON.stringify({
             ...data,
-            timestamp: new Date().toISOString()
-          })
+            timestamp: new Date().toISOString(),
+          }),
         });
 
         if (!response.ok) {
           const errorData = await response.json();
-          throw new Error(errorData.message || 'Failed to save power data');
+          throw new Error(errorData.message || "Failed to save power data");
         }
 
         const result = await response.json();
@@ -117,12 +118,12 @@ function App() {
   return (
     <div className="font-sans bg-white text-gray-900">
       <Navbar />
-      
+
       {/* Backend error notification */}
       {backendError && (
         <div className="fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50">
           <p>Backend Error: {backendError}</p>
-          <button 
+          <button
             onClick={() => setBackendError(null)}
             className="mt-2 text-sm underline"
           >
@@ -130,7 +131,7 @@ function App() {
           </button>
         </div>
       )}
-      
+
       {/* Saving indicator */}
       {isSaving && (
         <div className="fixed bottom-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50">
@@ -146,8 +147,8 @@ function App() {
           <Route
             path="/Dashboard"
             element={
-              <Dashboard 
-                powerData={powerData} 
+              <Dashboard
+                powerData={powerData}
                 deviceLabels={DEVICE_LABELS}
                 backendError={backendError}
               />
@@ -163,6 +164,7 @@ function App() {
           <Route path="/assistant/morning-brief" element={<MorningBrief />} />
           <Route path="/assistant/pet" element={<PetCare />} />
           <Route path="/assistant/smart-kitchen" element={<SmartKitchen />} />
+          <Route path="/assistant/decor-sense" element={<DecorSense />} />
         </Routes>
       </div>
     </div>

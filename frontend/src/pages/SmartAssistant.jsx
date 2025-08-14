@@ -27,11 +27,11 @@ export default function SmartAssistant() {
       side: "right",
     },
     {
-      id: "comfort-predictor",
-      title: "🌿 Indoor Comfort Predictor",
-      description: "Predict comfort score based on room data.",
-      link: "/assistant/comfort",
-      tooltip: "Feel comfy always!",
+      id: "virtual-stylist",
+      title: "🛋️ DecorSense - AI Home Interior Stylist",
+      description: "Upload your room photo & let AI suggest stylish improvements.",
+      link: "/assistant/decor-sense",
+      tooltip: "Transform your space with AI!",
       side: "left",
     },
     {

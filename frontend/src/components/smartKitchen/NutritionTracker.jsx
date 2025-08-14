@@ -20,7 +20,8 @@ export default function NutritionTracker() {
         }
       );
 
-      setNutrition(res.data.nutrition);
+      setNutrition(res.data.nutrition.nutrition);
+      console.log(nutrition)
     } catch (err) {
       console.error(
         "Error tracking nutrition:",
