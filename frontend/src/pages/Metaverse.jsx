@@ -33,8 +33,8 @@ const deviceLabels = {
 };
 
 const ALERT_THRESHOLDS = {
-  DAILY_COST: 30, // ₹50 per day
-  POWER_CONSUMPTION: 1200, // 1200W
+  DAILY_COST: 200,
+  POWER_CONSUMPTION: 3000,
 };
 
 function Metaverse() {
@@ -47,10 +47,11 @@ function Metaverse() {
     peak: 0,
     devices: [],
     timestamp: "",
+    date: new Date().toDateString()
   });
-  const [gameInstance, setGameInstance] = useState(null);
   const [costAlertShown, setCostAlertShown] = useState(false);
   const [powerAlertShown, setPowerAlertShown] = useState(false);
+  const [historicalData, setHistoricalData] = useState([]);
 
   useEffect(() => {
     const iframe = document.createElement("iframe");
@@ -67,9 +68,21 @@ function Metaverse() {
       if (event.data?.type === "GAME_LOADED") {
         setGameLoaded(true);
       } else if (event.data?.type === "POWER_UPDATE") {
-        setPowerData(event.data.payload);
-        checkAlerts(event.data.payload);
-        sendToBackend(event.data.payload);
+        const newData = event.data.payload;
+        
+        if (newData.date !== powerData.date) {
+          setCostAlertShown(false);
+          setPowerAlertShown(false);
+        }
+        
+        setPowerData(newData);
+        checkAlerts(newData);
+        
+        // Send data to parent (App component)
+        window.parent.postMessage({
+          type: "POWER_UPDATE_FROM_METAVERSE",
+          payload: newData
+        }, "*");
       }
     };
 
@@ -77,8 +90,33 @@ function Metaverse() {
     return () => window.removeEventListener("message", handleMessage);
   }, []);
 
+  useEffect(() => {
+    // Load historical data when component mounts
+    const fetchHistoricalData = async () => {
+      try {
+        const response = await fetch('/api/power/history?days=7');
+        const data = await response.json();
+        if (data.success && Array.isArray(data.data)) {
+          setHistoricalData(data.data);
+        }
+      } catch (error) {
+        console.error("Error fetching historical data:", error);
+        // Generate mock data for development
+        const mockData = Array.from({ length: 24 }, (_, i) => ({
+          timestamp: new Date(Date.now() - (24 - i) * 3600000).toISOString(),
+          power: Math.floor(Math.random() * 2000) + 500,
+          energy: (Math.random() * 10).toFixed(2),
+          cost: (Math.random() * 100).toFixed(2),
+          peak: 2500
+        }));
+        setHistoricalData(mockData);
+      }
+    };
+    
+    fetchHistoricalData();
+  }, []);
+
   const checkAlerts = (data) => {
-    // Check daily cost threshold
     if (data.cost >= ALERT_THRESHOLDS.DAILY_COST && !costAlertShown) {
       toast.error(
         `High electricity bill! Daily cost reached ₹${data.cost.toFixed(2)}`,
@@ -96,7 +134,6 @@ function Metaverse() {
       setCostAlertShown(false);
     }
 
-    // Check power consumption threshold
     if (data.power >= ALERT_THRESHOLDS.POWER_CONSUMPTION && !powerAlertShown) {
       toast.error(
         `High power usage! ${data.power}W consumed`,
@@ -112,23 +149,6 @@ function Metaverse() {
       setPowerAlertShown(true);
     } else if (data.power < ALERT_THRESHOLDS.POWER_CONSUMPTION * 0.9) {
       setPowerAlertShown(false);
-    }
-  };
-
-  const sendToBackend = async (data) => {
-    try {
-      const response = await fetch("/api/power", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(data),
-      });
-      if (!response.ok) {
-        console.error("Failed to save power data");
-      }
-    } catch (error) {
-      console.error("Error sending data to backend:", error);
     }
   };
 
@@ -206,10 +226,9 @@ function Metaverse() {
           )}
         </div>
 
-        {/* Dashboard Panel - Maintained exact dimensions (1000x720) */}
+        {/* Dashboard Panel */}
         {showDashboard && (
           <div className="fixed top-16 right-4 w-[1000px] h-[720px] bg-gradient-to-b from-gray-800 to-gray-900 shadow-2xl z-20 border-2 border-gray-600 rounded-[24px] flex flex-col overflow-hidden">
-            {/* Dashboard Header */}
             <div className="sticky top-0 bg-gradient-to-r from-gray-800 to-gray-700 p-4 border-b border-gray-600 z-10 rounded-t-[24px]">
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-2">
@@ -238,9 +257,12 @@ function Metaverse() {
               </div>
             </div>
 
-            {/* Scrollable Dashboard Content */}
             <div className="flex-1 overflow-y-auto custom-scrollbar">
-              <Dashboard powerData={powerData} deviceLabels={deviceLabels} />
+              <Dashboard 
+                powerData={powerData} 
+                deviceLabels={deviceLabels} 
+                historicalData={historicalData} 
+              />
             </div>
           </div>
         )}

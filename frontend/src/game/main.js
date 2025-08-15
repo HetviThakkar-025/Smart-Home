@@ -2,20 +2,20 @@ import Phaser from "phaser";
 
 const POWER_CONFIG = {
   devices: {
-    light: { wattage: 40, type: "light", label: "Tube Light" }, // Common LED tube light wattage
-    fan: { wattage: 75, type: "fan", label: "Fan" }, // Standard ceiling fan wattage
-    tv: { wattage: 75, type: "appliance", label: "TV" }, // Modern LED TV wattage
-    oven: { wattage: 1000, type: "appliance", label: "Microwave Oven" }, // Typical microwave oven wattage
+    light: { wattage: 40, type: "light", label: "Tube Light" },
+    fan: { wattage: 75, type: "fan", label: "Fan" },
+    tv: { wattage: 75, type: "appliance", label: "TV" },
+    oven: { wattage: 1000, type: "appliance", label: "Microwave Oven" },
     fridge: {
-      wattage: 150, // Average running wattage, as it cycles
+      wattage: 150,
       type: "appliance",
-      alwaysOn: true, // Runs 50% of the time
+      alwaysOn: true,
       label: "Fridge",
     },
-    mirror: { wattage: 10, type: "light", label: "Mirror Light" }, // Low wattage light
-    chimney: { wattage: 200, type: "fan", label: "Kitchen Chimney" }, // Typical kitchen chimney wattage
+    mirror: { wattage: 10, type: "light", label: "Mirror Light" },
+    chimney: { wattage: 200, type: "fan", label: "Kitchen Chimney" },
     washingmachine: {
-      wattage: 500, // Common washing machine wattage
+      wattage: 500,
       type: "appliance",
       label: "Washing Machine",
     },
@@ -24,9 +24,9 @@ const POWER_CONFIG = {
     bed: { wattage: 0, type: "furniture", label: "Bed" },
     sofa: { wattage: 0, type: "furniture", label: "Sofa" },
   },
-  electricityRate: 6.0, // ₹6 per kWh (typical Indian residential electricity rate)
-  updateInterval: 1000, // Update every second
-  minuteInterval: 60000, // Save every minute
+  electricityRate: 6.0, // ₹6 per kWh
+  updateInterval: 1000,
+  minuteInterval: 60000,
 };
 
 class SmartHomeScene extends Phaser.Scene {
@@ -35,15 +35,16 @@ class SmartHomeScene extends Phaser.Scene {
     this.devices = [];
     this.lamps = [];
     this.deviceLabels = [];
-    this.instantPower = 0; // Watts
-    this.dailyEnergy = 0; // kWh
-    this.dailyCost = 0; // ₹
-    this.peakPower = 0; // Watts
+    this.instantPower = 0;
+    this.dailyEnergy = 0;
+    this.dailyCost = 0;
+    this.peakPower = 0;
     this.lastUpdateTime = Date.now();
     this.lastSavedTime = 0;
-    this.gameStateKey = "smartHomeFullState_v4";
-    this.fridgeCycleState = false; // Track fridge on/off cycle
+    this.gameStateKey = "smartHomeFullState_v5";
+    this.fridgeCycleState = false;
     this.fridgeCycleTimer = 0;
+    this.currentDate = new Date().toDateString();
   }
 
   preload() {
@@ -252,12 +253,22 @@ class SmartHomeScene extends Phaser.Scene {
 
   updatePowerConsumption() {
     const now = Date.now();
-    const timeElapsed = (now - this.lastUpdateTime) / 1000; // in seconds
+    const currentDate = new Date().toDateString();
+    
+    // Reset daily metrics if date changed
+    if (currentDate !== this.currentDate) {
+      this.dailyEnergy = 0;
+      this.dailyCost = 0;
+      this.peakPower = 0;
+      this.currentDate = currentDate;
+    }
+
+    const timeElapsed = (now - this.lastUpdateTime) / 1000;
     this.lastUpdateTime = now;
 
-    // Update fridge cycle (runs 50% of time if alwaysOn)
+    // Update fridge cycle
     this.fridgeCycleTimer += timeElapsed;
-    if (this.fridgeCycleTimer >= 1800) { // 30 minute cycle
+    if (this.fridgeCycleTimer >= 1800) {
       this.fridgeCycleTimer = 0;
       this.fridgeCycleState = !this.fridgeCycleState;
     }
@@ -288,7 +299,6 @@ class SmartHomeScene extends Phaser.Scene {
       let state = isOn ? "ON" : "OFF";
 
       if (config.alwaysOn) {
-        // For always-on devices like fridge
         isOn = this.fridgeCycleState;
         devicePower = isOn ? config.wattage : 0;
         state = isOn ? "RUNNING" : "IDLE";
@@ -309,8 +319,8 @@ class SmartHomeScene extends Phaser.Scene {
     this.instantPower = Math.round(totalPower);
     if (totalPower > this.peakPower) this.peakPower = Math.round(totalPower);
 
-    // Calculate energy consumption (kWh = (Watts × hours) / 1000)
-    const energyIncrement = (totalPower * timeElapsed) / 3600000; // Convert to kWh
+    // Calculate energy consumption
+    const energyIncrement = (totalPower * timeElapsed) / 3600000;
     this.dailyEnergy += energyIncrement;
     this.dailyCost = this.dailyEnergy * POWER_CONFIG.electricityRate;
 
@@ -351,7 +361,8 @@ class SmartHomeScene extends Phaser.Scene {
       dailyCost: this.dailyCost,
       peakPower: this.peakPower,
       lastUpdateTime: this.lastUpdateTime,
-      lastSavedTime: this.lastSavedTime
+      lastSavedTime: this.lastSavedTime,
+      currentDate: this.currentDate
     };
 
     localStorage.setItem(this.gameStateKey, JSON.stringify(state));
@@ -363,6 +374,14 @@ class SmartHomeScene extends Phaser.Scene {
 
     try {
       const state = JSON.parse(savedState);
+      
+      // Check if we need to reset daily metrics (new day)
+      const today = new Date().toDateString();
+      if (state.currentDate !== today) {
+        state.dailyEnergy = 0;
+        state.dailyCost = 0;
+        state.peakPower = 0;
+      }
       
       if (state.lamps && this.lamps.length > 0) {
         state.lamps.forEach((savedLamp, index) => {
@@ -389,6 +408,7 @@ class SmartHomeScene extends Phaser.Scene {
       this.peakPower = state.peakPower || 0;
       this.lastUpdateTime = state.lastUpdateTime || Date.now();
       this.lastSavedTime = state.lastSavedTime || 0;
+      this.currentDate = state.currentDate || today;
 
     } catch (error) {
       console.error("Error loading game state:", error);
@@ -402,7 +422,8 @@ class SmartHomeScene extends Phaser.Scene {
       cost: parseFloat(this.dailyCost.toFixed(2)),
       peak: this.peakPower,
       devices: deviceDetails,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      date: this.currentDate
     };
 
     window.parent.postMessage({
@@ -419,7 +440,8 @@ class SmartHomeScene extends Phaser.Scene {
         cost: parseFloat(this.dailyCost.toFixed(2)),
         peak: this.peakPower,
         devices: deviceDetails,
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        date: this.currentDate
       };
 
       const response = await fetch('/api/power', {
