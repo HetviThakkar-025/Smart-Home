@@ -106,27 +106,36 @@ function App() {
     };
 
     const sendToBackend = async (data) => {
+      // Helper to safely parse JSON without crashing
+      const parseJSONSafe = async (response) => {
+        try {
+          const text = await response.text();
+          return text ? JSON.parse(text) : {};
+        } catch {
+          return {};
+        }
+      };
+
       try {
         setIsSaving(true);
         setBackendError(null);
 
         const response = await fetch("/api/power", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             ...data,
             timestamp: new Date().toISOString(),
           }),
         });
 
+        const jsonData = await parseJSONSafe(response);
+
         if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.message || "Failed to save power data");
+          throw new Error(jsonData.message || "Failed to save power data");
         }
 
-        return await response.json();
+        return jsonData;
       } catch (error) {
         console.error("Backend error:", error);
         setBackendError(error.message);
