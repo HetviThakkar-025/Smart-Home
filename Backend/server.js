@@ -1,8 +1,19 @@
-// server.js
-import express from "express";
-import mongoose from "mongoose";
-import dotenv from "dotenv";
-import cors from "cors";
+const dotenv = require("dotenv");
+const express = require("express");
+const mongoose = require("mongoose");
+const cors = require("cors");
+const authRoutes = require("./routes/authRoutes");
+const analyticsRoutes = require("./routes/analytics");
+const notesRoutes = require("./routes/notes");
+const quoteRoutes = require("./routes/quoteRoutes");
+const weatherRoutes = require("./routes/weather");
+const focusRoutes = require("./routes/focus");
+const newsRoute = require("./routes/news");
+const petCareRoutes = require("./routes/petCare");
+const smartKitchenRoutes = require("./routes/smartKitchen");
+const powerRoutes = require("./routes/powerRoutes");
+const errorHandler = require("./middleware/errorHandler");
+const decorsenseRoutes = require("./routes/decorsense");
 
 dotenv.config();
 
@@ -19,22 +30,23 @@ if (!process.env.MONGO_URI) {
 }
 
 // Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI, {
-  useNewUrlParser: true,
-  useUnifiedTopology: true,
-})
-.then(() => console.log("✅ MongoDB connected"))
-.catch(err => {
-  console.error("❌ MongoDB connection error:", err);
-  process.exit(1);
-});
+mongoose
+  .connect(process.env.MONGO_URI, {
+    useNewUrlParser: true,
+    useUnifiedTopology: true,
+  })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => {
+    console.error("❌ MongoDB connection error:", err);
+    process.exit(1);
+  });
 
 // Power Schema & Model
 const powerSchema = new mongoose.Schema({
   device: String,
   state: String,
   powerUsage: Number,
-  timestamp: { type: Date, default: Date.now }
+  timestamp: { type: Date, default: Date.now },
 });
 
 const Power = mongoose.model("Power", powerSchema);
@@ -48,7 +60,9 @@ app.post("/api/power", async (req, res) => {
     res.status(200).json({ success: true, message: "Power data saved" });
   } catch (err) {
     console.error("❌ Error saving power data:", err);
-    res.status(500).json({ success: false, message: "Server error saving power data" });
+    res
+      .status(500)
+      .json({ success: false, message: "Server error saving power data" });
   }
 });
 
@@ -56,6 +70,20 @@ app.post("/api/power", async (req, res) => {
 app.get("/", (req, res) => {
   res.send("Smart Home Backend is running 🚀");
 });
+
+app.use("/api/auth", authRoutes);
+app.use("/api/analytics", analyticsRoutes);
+app.use("/api/notes", notesRoutes);
+app.use("/api/quotes", quoteRoutes);
+app.use("/api/weather", weatherRoutes);
+app.use("/api/focus", focusRoutes);
+app.use("/api/news", newsRoute);
+app.use("/api/power", powerRoutes);
+app.use("/api/power", powerRoutes);
+app.use("/api/petcare", petCareRoutes);
+app.use("/api/smart-kitchen", smartKitchenRoutes);
+app.use("/api/decorsense", decorsenseRoutes);
+app.use(errorHandler);
 
 // Start Server
 const PORT = process.env.PORT || 5000;
