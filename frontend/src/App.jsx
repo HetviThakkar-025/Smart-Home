@@ -15,6 +15,7 @@ import NotesWall from "./pages/NotesWall";
 import MorningBrief from "./pages/MorningBrief";
 import PetCare from "./pages/PetCare";
 import SmartKitchen from "./pages/SmartKitchen";
+import DecorSense from "./pages/DecorSense";
 
 const DEVICE_LABELS = {
   light: "Tube Light",
@@ -42,7 +43,7 @@ const INITIAL_POWER_DATA = {
   cost: 0,
   peak: 0,
   devices: [],
-  timestamp: new Date().toISOString()
+  timestamp: new Date().toISOString(),
 };
 
 function App() {
@@ -54,23 +55,25 @@ function App() {
   useEffect(() => {
     const fetchHistoricalData = async () => {
       try {
-        const response = await fetch('/api/power/history?days=7');
+        const response = await fetch("/api/power/history?days=7");
         const data = await response.json();
         if (data.success && Array.isArray(data.data)) {
           setHistoricalData(data.data);
         }
       } catch (error) {
         console.error("Error fetching historical data:", error);
-        setHistoricalData(Array.from({ length: 24 }, (_, i) => ({
-          timestamp: new Date(Date.now() - (24 - i) * 3600000).toISOString(),
-          power: Math.floor(Math.random() * 2000) + 500,
-          energy: (Math.random() * 10).toFixed(2),
-          cost: (Math.random() * 100).toFixed(2),
-          peak: 2500
-        })));
+        setHistoricalData(
+          Array.from({ length: 24 }, (_, i) => ({
+            timestamp: new Date(Date.now() - (24 - i) * 3600000).toISOString(),
+            power: Math.floor(Math.random() * 2000) + 500,
+            energy: (Math.random() * 10).toFixed(2),
+            cost: (Math.random() * 100).toFixed(2),
+            peak: 2500,
+          }))
+        );
       }
     };
-    
+
     fetchHistoricalData();
   }, []);
 
@@ -79,9 +82,9 @@ function App() {
       try {
         if (event.data?.type === "POWER_UPDATE") {
           console.log("Received POWER_UPDATE:", event.data.payload);
-          
+
           const validatedData = validatePowerData(event.data.payload);
-          setPowerData(prev => ({
+          setPowerData((prev) => ({
             ...prev,
             ...validatedData,
             timestamp: new Date().toISOString(),
@@ -101,7 +104,7 @@ function App() {
         cost: Number(data.cost) || 0,
         peak: Number(data.peak) || 0,
         devices: Array.isArray(data.devices) ? data.devices : [],
-        date: data.date || new Date().toDateString()
+        date: data.date || new Date().toDateString(),
       };
     };
 
@@ -149,10 +152,10 @@ function App() {
       try {
         await sendToBackend({
           ...data,
-          isDailySummary: true
+          isDailySummary: true,
         });
       } catch (error) {
-        console.error('Error saving daily summary:', error);
+        console.error("Error saving daily summary:", error);
       }
     };
 
@@ -165,12 +168,12 @@ function App() {
   return (
     <div className="font-sans bg-white text-gray-900 min-h-screen">
       <Navbar />
-      
+
       {/* Backend error notification */}
       {backendError && (
         <div className="fixed top-4 right-4 bg-red-500 text-white p-4 rounded-lg shadow-lg z-50">
           <p>Backend Error: {backendError}</p>
-          <button 
+          <button
             onClick={() => setBackendError(null)}
             className="mt-2 text-sm underline"
           >
@@ -178,7 +181,7 @@ function App() {
           </button>
         </div>
       )}
-      
+
       {/* Saving indicator */}
       {isSaving && (
         <div className="fixed bottom-4 right-4 bg-blue-500 text-white p-3 rounded-lg shadow-lg z-50">
@@ -201,14 +204,14 @@ function App() {
               />
             }
           />
-          <Route 
-            path="/Metaverse/2bhk" 
+          <Route
+            path="/Metaverse/2bhk"
             element={
-              <Metaverse 
+              <Metaverse
                 deviceLabels={DEVICE_LABELS}
                 alertThresholds={ALERT_THRESHOLDS}
               />
-            } 
+            }
           />
           <Route path="/Homemeta" element={<Homemeta />} />
           <Route path="/Metaverse/1bhk" element={<Meta1bhk />} />
@@ -219,6 +222,7 @@ function App() {
           <Route path="/assistant/morning-brief" element={<MorningBrief />} />
           <Route path="/assistant/pet" element={<PetCare />} />
           <Route path="/assistant/smart-kitchen" element={<SmartKitchen />} />
+          <Route path="/assistant/decor-sense" element={<DecorSense />} />
         </Routes>
       </div>
     </div>

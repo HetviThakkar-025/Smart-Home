@@ -20,7 +20,7 @@ router.post("/analyze", upload.single("roomImage"), async (req, res) => {
 
     const colabEndpoint =
       process.env.COLAB_API_URL ||
-      "https://4fb946d796b9.ngrok-free.app/analyze";
+      "https://462c5e929938.ngrok-free.app/analyze";
 
     const formData = new FormData();
     formData.append("file", req.file.buffer, {
@@ -28,6 +28,7 @@ router.post("/analyze", upload.single("roomImage"), async (req, res) => {
       contentType: req.file.mimetype,
     });
     formData.append("mode", req.body.mode || "mood");
+    console.log(formData);
 
     // Send to Colab
     const colabRes = await fetch(colabEndpoint, {

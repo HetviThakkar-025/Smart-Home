@@ -31,6 +31,7 @@ export default function DecorSense() {
       const formData = new FormData();
       formData.append("roomImage", imageFile); // multer field name
       formData.append("mode", mode); // pass selected mode to backend
+      console.log(formData);
 
       const res = await fetch("/api/decorsense/analyze", {
         method: "POST",
