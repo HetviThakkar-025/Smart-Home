@@ -33,15 +33,7 @@ function HomeMeta() {
       description: "Luxury Living",
       link: "/Metaverse/3bhK",
     },
-    {
-      id: "customize",
-      name: "Customize",
-      icon: <Settings className="w-12 h-12" />,
-      color: "from-purple-400 to-pink-500",
-      shadow: "shadow-purple-500/50",
-      description: "Design Your Own",
-      link: "/customize-home",
-    },
+    
   ];
 
   const handleOptionClick = (option) => {
