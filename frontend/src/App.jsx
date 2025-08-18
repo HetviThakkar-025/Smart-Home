@@ -1,6 +1,7 @@
 import { Routes, Route } from "react-router-dom";
 import { useState, useEffect } from "react";
 import Navbar from "./components/Navbar";
+import Footer from "./components/Footer";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
@@ -225,6 +226,8 @@ function App() {
           <Route path="/assistant/decor-sense" element={<DecorSense />} />
         </Routes>
       </div>
+
+      <Footer />
     </div>
   );
 }
