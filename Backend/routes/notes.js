@@ -8,7 +8,7 @@ router.post("/", async (req, res) => {
   try {
     const { userId, content } = req.body;
     // call FastAPI to get urgency
-    const response = await axios.post("http://localhost:8000/predict_urgency", {
+    const response = await axios.post("http://localhost:8001/predict_urgency", {
       text: content,
     });
     const urgency = response.data.urgency;
