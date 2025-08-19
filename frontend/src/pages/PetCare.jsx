@@ -1,6 +1,14 @@
 import React, { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { PawPrint } from "lucide-react";
+import {
+  PawPrint,
+  Plus,
+  RefreshCw,
+  Activity,
+  Heart,
+  Utensils,
+  AlertTriangle,
+} from "lucide-react";
 import axios from "axios";
 
 export default function PetCareAssistant() {
@@ -58,7 +66,7 @@ export default function PetCareAssistant() {
             Authorization: `Bearer ${localStorage.getItem("token")}`,
           },
         });
-        setFeedings(res.data); // assuming backend returns an array of logs
+        setFeedings(res.data);
       } catch (error) {
         console.error("Error fetching feeding logs:", error);
       }
@@ -95,17 +103,14 @@ export default function PetCareAssistant() {
 
   const refreshPrediction = async () => {
     try {
-      // 1. Get real weather data from your backend weather route
       const weatherRes = await axios.get("/api/weather");
       const { temp: temperature, humidity } = weatherRes.data;
 
-      // 2. Get feeding logs for logged-in user
       const logsRes = await axios.get("/api/petcare", {
         headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
       });
       const logs = logsRes.data;
 
-      // 3. Calculate feeding interval in hours from latest log
       let feeding_interval = 0;
       if (logs.length > 0) {
         const lastFeedingTime = new Date(logs[0].time);
@@ -114,10 +119,8 @@ export default function PetCareAssistant() {
         );
       }
 
-      // 4. Activity level could be static for now, later from sensor/device
       const activity_level = 7;
 
-      // 5. Send to Node backend → Python model
       const res = await axios.post(
         "/api/petcare/predict-comfort",
         { temperature, humidity, feeding_interval, activity_level },
@@ -129,7 +132,6 @@ export default function PetCareAssistant() {
       const comfort = res.data.comfort_level;
       setComfortLevel(comfort);
 
-      // 6. Convert label to score
       if (comfort === "comfortable") setComfortScore(90);
       else if (comfort === "neutral") setComfortScore(60);
       else setComfortScore(30);
@@ -148,7 +150,6 @@ export default function PetCareAssistant() {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
-      console.log(res.data.risk);
       setHealthRisk(res.data.risk);
     } catch (err) {
       console.error("Error checking health risk:", err);
@@ -164,7 +165,6 @@ export default function PetCareAssistant() {
           headers: { Authorization: `Bearer ${localStorage.getItem("token")}` },
         }
       );
-      console.log(res.data);
       setDietPlan(res.data.recommendation);
     } catch (err) {
       console.error("Error getting diet plan:", err);
@@ -172,230 +172,359 @@ export default function PetCareAssistant() {
   };
 
   return (
-    <motion.div
-      className="min-h-screen bg-gradient-to-b from-[#0e1628] to-[#1a2238] text-white p-8"
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.8 }}
-    >
-      {/* Header */}
-      <div className="text-center mb-8 mt-10">
-        <motion.h1
-          className="text-5xl font-bold flex items-center justify-center gap-3"
-          initial={{ y: -30, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
+    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden pt-24 pb-16">
+      {/* Animated Background Elements */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-pink-500/10 to-purple-500/10 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl animate-float animation-delay-2000"></div>
+      </div>
+
+      {/* Grid Pattern Overlay */}
+      <div className="absolute inset-0 opacity-10">
+        <div
+          className="w-full h-full"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(59, 130, 246, 0.3) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(59, 130, 246, 0.3) 1px, transparent 1px)
+            `,
+            backgroundSize: "50px 50px",
+          }}
+        ></div>
+      </div>
+
+      <div className="relative z-10 px-6 lg:px-8">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8 }}
+          className="text-center mb-12"
         >
-          <PawPrint className="text-pink-400 w-10 h-10" />
-          Pet Care Assistant 🐾
-        </motion.h1>
-        <p className="text-lg text-gray-300 mt-7 font-semibold">
-          🐱 Track feedings, monitor comfort, and get AI tips for your furry
-          friend 🐶
-        </p>
-      </div>
-
-      {/* Content */}
-      <div className="grid md:grid-cols-3 gap-6">
-        {/* Add Feeding */}
-        <motion.div
-          className="bg-[#131b2e] p-6 rounded-2xl shadow-lg hover:shadow-pink-400/30 transition-all mt-5"
-          whileHover={{ scale: 1.03 }}
-        >
-          <h2 className="text-2xl font-semibold mb-4">🍖 Add Feeding</h2>
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Food (e.g., Dry Kibble - 30g)"
-            value={food}
-            onChange={(e) => setFood(e.target.value)}
-          />
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Notes (optional)"
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-          />
-          <div className="flex gap-3">
-            <button
-              onClick={addFeeding}
-              className="bg-gradient-to-r from-pink-500 to-purple-500 px-4 py-2 rounded-lg hover:scale-105 transition-all"
-            >
-              Add Feeding
-            </button>
-            <button
-              onClick={() => {
-                setFood("");
-                setNotes("");
-              }}
-              className="bg-gray-700 px-4 py-2 rounded-lg hover:scale-105 transition-all"
-            >
-              Clear
-            </button>
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <div className="w-16 h-16 bg-gradient-to-r from-pink-600 to-purple-600 rounded-2xl flex items-center justify-center text-3xl shadow-lg shadow-pink-500/30">
+              🐾
+            </div>
+            <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-pink-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+              Pet Care Assistant
+            </h1>
           </div>
-          <hr className="my-4 border-gray-600" />
-          <h3 className="text-lg font-medium mb-2">📜 Recent Logs</h3>
-          {feedings.length === 0 ? (
-            <p className="text-gray-400">No feedings yet.</p>
-          ) : (
-            <ul className="space-y-2">
-              {feedings.map((f, i) => (
-                <li key={i} className="bg-[#0f1424] p-2 rounded-md">
-                  <strong>{f.food}</strong> - {f.notes || "No notes"} <br />
-                  <span className="text-gray-400 text-sm">{f.time}</span>
-                </li>
-              ))}
-            </ul>
-          )}
+          <p className="text-xl text-white/70 font-light">
+            Track feedings, monitor comfort, and get AI tips for your furry
+            friend
+          </p>
+          <div className="w-24 h-1 bg-gradient-to-r from-pink-400 to-purple-400 mx-auto mt-4 rounded-full"></div>
         </motion.div>
 
-        {/* Comfort Meter */}
-        <motion.div
-          className="bg-[#131b2e] p-6 rounded-2xl shadow-lg hover:shadow-pink-400/30 transition-all mt-5"
-          whileHover={{ scale: 1.03 }}
-        >
-          <h2 className="text-2xl font-semibold mb-4">🌡 Comfort Meter</h2>
-          <p className="text-gray-400 mb-2">
-            AI prediction based on feeding & environment.
-          </p>
-          <div className="text-4xl font-bold text-pink-400 mb-4 mt-4">
-            {comfortScore !== null ? `${comfortScore}%` : "--"}
-          </div>
+        {/* Main Content Grid */}
+        <div className="grid md:grid-cols-3 gap-8 mb-8">
+          {/* Add Feeding */}
+          <motion.div
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group hover:border-pink-400/30"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-gradient-to-r from-pink-600 to-purple-600 rounded-lg shadow-lg shadow-pink-500/20">
+                <Utensils className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">Add Feeding</h2>
+            </div>
 
-          {comfortLevel && (
-            <p className="text-md text-gray-300 italic mb-4 mt-4">
-              {getPetCareTips(comfortLevel)}
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all"
+              placeholder="Food (e.g., Dry Kibble - 30g)"
+              value={food}
+              onChange={(e) => setFood(e.target.value)}
+            />
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-pink-500 transition-all"
+              placeholder="Notes (optional)"
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+            />
+
+            <div className="flex gap-3">
+              <motion.button
+                onClick={addFeeding}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-gradient-to-r from-pink-600 to-purple-600 px-4 py-2 rounded-lg font-semibold shadow-lg hover:shadow-pink-500/30 transition-all flex items-center gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Add Feeding
+              </motion.button>
+              <motion.button
+                onClick={() => {
+                  setFood("");
+                  setNotes("");
+                }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="bg-white/10 px-4 py-2 rounded-lg font-semibold border border-white/10 hover:bg-white/20 transition-all"
+              >
+                Clear
+              </motion.button>
+            </div>
+
+            <hr className="my-4 border-white/10" />
+
+            <h3 className="text-lg font-medium mb-2 text-white">Recent Logs</h3>
+            {feedings.length === 0 ? (
+              <p className="text-gray-400">No feedings yet.</p>
+            ) : (
+              <ul className="space-y-2">
+                {feedings.map((f, i) => (
+                  <li
+                    key={i}
+                    className="bg-white/5 p-3 rounded-lg border border-white/10"
+                  >
+                    <strong className="text-white">{f.food}</strong> -{" "}
+                    {f.notes || "No notes"} <br />
+                    <span className="text-gray-400 text-sm">{f.time}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </motion.div>
+
+          {/* Comfort Meter */}
+          <motion.div
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group hover:border-blue-400/30"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-gradient-to-r from-blue-600 to-cyan-600 rounded-lg shadow-lg shadow-blue-500/20">
+                <Activity className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">
+                Comfort Meter
+              </h2>
+            </div>
+
+            <p className="text-gray-400 mb-4">
+              AI prediction based on feeding & environment.
             </p>
-          )}
 
-          <button
-            onClick={refreshPrediction}
-            className="bg-blue-600 px-4 py-2 rounded-lg hover:scale-105 transition-all mt-4"
+            <div className="text-5xl font-bold text-center mb-4 bg-gradient-to-r from-pink-400 to-purple-400 bg-clip-text text-transparent">
+              {comfortScore !== null ? `${comfortScore}%` : "--"}
+            </div>
+
+            {comfortLevel && (
+              <p className="text-md text-gray-300 italic mb-4 p-3 bg-white/5 rounded-lg border border-white/10">
+                {getPetCareTips(comfortLevel)}
+              </p>
+            )}
+
+            <motion.button
+              onClick={refreshPrediction}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full bg-gradient-to-r from-blue-600 to-cyan-600 px-4 py-3 rounded-lg font-semibold shadow-lg hover:shadow-blue-500/30 transition-all flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Refresh Prediction
+            </motion.button>
+          </motion.div>
+
+          {/* Pet Tips */}
+          <motion.div
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group hover:border-green-400/30"
+            whileHover={{ scale: 1.02 }}
           >
-            Refresh Prediction
-          </button>
-        </motion.div>
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg shadow-lg shadow-green-500/20">
+                <Heart className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">
+                Pet Care Tips
+              </h2>
+            </div>
 
-        {/* Pet Tips */}
-        <motion.div
-          className="bg-[#131b2e] p-6 rounded-2xl shadow-lg hover:shadow-pink-400/30 transition-all mt-5"
-          whileHover={{ scale: 1.03 }}
-        >
-          <h2 className="text-2xl font-semibold mb-4">💡 Pet Care Tips</h2>
-          <ul className="list-disc list-inside text-gray-300 space-y-2">
-            <li>Keep fresh water available 24/7.</li>
-            <li>Adjust feeding amount if comfort score is low.</li>
-            <li>Log symptoms like vomiting or lethargy.</li>
-            <li>Maintain a consistent feeding schedule.</li>
-            <li>Provide daily playtime and exercise.</li>
-          </ul>
-        </motion.div>
+            <ul className="space-y-3">
+              <li className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
+                <span className="text-gray-300">
+                  Keep fresh water available 24/7
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
+                <span className="text-gray-300">
+                  Adjust feeding amount if comfort score is low
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
+                <span className="text-gray-300">
+                  Log symptoms like vomiting or lethargy
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
+                <span className="text-gray-300">
+                  Maintain a consistent feeding schedule
+                </span>
+              </li>
+              <li className="flex items-start gap-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full mt-2"></div>
+                <span className="text-gray-300">
+                  Provide daily playtime and exercise
+                </span>
+              </li>
+            </ul>
+          </motion.div>
+        </div>
+
+        {/* Advanced Features Grid */}
+        <div className="grid md:grid-cols-2 gap-8">
+          {/* Health Anomaly Detection */}
+          <motion.div
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group hover:border-red-400/30"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-gradient-to-r from-red-600 to-orange-600 rounded-lg shadow-lg shadow-red-500/20">
+                <AlertTriangle className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">
+                Health Anomaly Detection
+              </h2>
+            </div>
+
+            <p className="text-gray-400 mb-4">
+              Enter your pet's recent symptoms, diet, and activities to check
+              health risks.
+            </p>
+
+            <textarea
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+              placeholder="Symptoms (e.g., vomiting, low energy)..."
+              value={symptoms}
+              onChange={(e) => setSymptoms(e.target.value)}
+              rows={3}
+            />
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+              placeholder="Recent food intake (e.g., Biscuits - 50g)"
+              value={recentFood}
+              onChange={(e) => setRecentFood(e.target.value)}
+            />
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-500 transition-all"
+              placeholder="Recent activity level (1-10)"
+              type="number"
+              value={recentActivity}
+              onChange={(e) => setRecentActivity(e.target.value)}
+            />
+
+            <motion.button
+              onClick={checkHealthRisk}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full bg-gradient-to-r from-red-600 to-orange-600 px-4 py-3 rounded-lg font-semibold shadow-lg hover:shadow-red-500/30 transition-all"
+            >
+              Check Health Risk
+            </motion.button>
+
+            {healthRisk && (
+              <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                <p className="text-lg font-semibold text-red-400 mb-2">
+                  RISK: {healthRisk.replace(/_/g, " ").toUpperCase()}
+                </p>
+                <p className="text-gray-300">{getPetHealthTips(healthRisk)}</p>
+              </div>
+            )}
+          </motion.div>
+
+          {/* Diet Personalization */}
+          <motion.div
+            className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-6 transition-all duration-500 group hover:border-green-400/30"
+            whileHover={{ scale: 1.02 }}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg shadow-lg shadow-green-500/20">
+                <Utensils className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-semibold text-white">
+                Diet Personalization
+              </h2>
+            </div>
+
+            <p className="text-gray-400 mb-4">
+              Get AI-recommended portion size and food type tailored to your
+              pet.
+            </p>
+
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+              placeholder="Breed (e.g., Labrador)"
+              value={breed}
+              onChange={(e) => setBreed(e.target.value)}
+            />
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+              placeholder="Weight (kg)"
+              type="number"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+            />
+            <input
+              className="w-full mb-3 p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-green-500 transition-all"
+              placeholder="Activity level (1-10)"
+              type="number"
+              value={dietActivity}
+              onChange={(e) => setDietActivity(e.target.value)}
+            />
+
+            <motion.button
+              onClick={getDietRecommendation}
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              className="w-full bg-gradient-to-r from-green-600 to-teal-600 px-4 py-3 rounded-lg font-semibold shadow-lg hover:shadow-green-500/30 transition-all"
+            >
+              Get Diet Plan
+            </motion.button>
+
+            {dietPlan && (
+              <div className="mt-4 p-4 bg-white/5 rounded-lg border border-white/10">
+                <p className="text-lg font-semibold text-green-400 mb-2">
+                  Recommended Diet
+                </p>
+                <p className="text-gray-300">
+                  Portion Size: {dietPlan.recommended_portion_g} g
+                </p>
+                <p className="text-gray-300">
+                  Food Type:{" "}
+                  {dietPlan.recommended_food_type
+                    .replace(/_/g, " ")
+                    .toUpperCase()}
+                </p>
+              </div>
+            )}
+          </motion.div>
+        </div>
       </div>
 
-      {/* New Features Section */}
-      <div className="grid md:grid-cols-2 gap-6 mt-8">
-        {/* 1. Health Anomaly Detection */}
-        <motion.div
-          className="bg-[#131b2e] p-6 rounded-2xl shadow-lg hover:shadow-pink-400/30 transition-all"
-          whileHover={{ scale: 1.03 }}
-        >
-          <h2 className="text-2xl font-semibold mb-4">
-            🩺 Health Anomaly Detection
-          </h2>
-          <p className="text-gray-400 mb-4">
-            Enter your pet’s recent symptoms, diet, and activities to check
-            health risks.
-          </p>
-          <textarea
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Symptoms (e.g., vomiting, low energy)..."
-            value={symptoms}
-            onChange={(e) => setSymptoms(e.target.value)}
-          />
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Recent food intake (e.g., Biscuits - 50g)"
-            value={recentFood}
-            onChange={(e) => setRecentFood(e.target.value)}
-          />
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Recent activity level (1-10)"
-            type="number"
-            value={recentActivity}
-            onChange={(e) => setRecentActivity(e.target.value)}
-          />
-          <button
-            onClick={checkHealthRisk}
-            className="bg-gradient-to-r from-red-500 to-orange-500 px-4 py-2 rounded-lg hover:scale-105 transition-all"
-          >
-            Check Health Risk
-          </button>
-          {healthRisk && (
-            <div className="mt-4 p-3 bg-[#0f1424] rounded-lg">
-              <p className="text-lg font-semibold text-pink-400">
-                RISK:{" "}
-                {healthRisk && healthRisk.replace(/_/g, " ").toUpperCase()}
-              </p>
-              <p className="text-gray-300">{getPetHealthTips(healthRisk)}</p>
-            </div>
-          )}
-        </motion.div>
-
-        {/* 2. Diet Personalization */}
-        <motion.div
-          className="bg-[#131b2e] p-6 rounded-2xl shadow-lg hover:shadow-pink-400/30 transition-all"
-          whileHover={{ scale: 1.03 }}
-        >
-          <h2 className="text-2xl font-semibold mb-4">
-            🍽 Diet Personalization
-          </h2>
-          <p className="text-gray-400 mb-4">
-            Get AI-recommended portion size and food type tailored to your pet.
-          </p>
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Breed (e.g., Labrador)"
-            value={breed}
-            onChange={(e) => setBreed(e.target.value)}
-          />
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Weight (kg)"
-            type="number"
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-          />
-          <input
-            className="w-full mb-3 p-3 rounded-lg bg-[#0f1424] text-white"
-            placeholder="Activity level (1-10)"
-            type="number"
-            value={dietActivity}
-            onChange={(e) => setDietActivity(e.target.value)}
-          />
-          <button
-            onClick={getDietRecommendation}
-            className="bg-gradient-to-r from-green-500 to-teal-500 px-4 py-2 rounded-lg hover:scale-105 transition-all"
-          >
-            Get Diet Plan
-          </button>
-          {dietPlan && (
-            <div className="mt-4 p-3 bg-[#0f1424] rounded-lg">
-              <p className="text-lg font-semibold text-green-400">
-                Recommended Diet
-              </p>
-              <p className="text-gray-300">
-                Portion Size: {dietPlan.recommended_portion_g} g
-              </p>
-              <p className="text-gray-300">
-                Food Type:{" "}
-                {dietPlan.recommended_food_type
-                  .replace(/_/g, " ")
-                  .toUpperCase()}
-              </p>
-            </div>
-          )}
-        </motion.div>
-      </div>
-    </motion.div>
+      {/* Custom animations */}
+      <style jsx global>{`
+        @keyframes float {
+          0% {
+            transform: translateY(0) rotate(0deg);
+          }
+          50% {
+            transform: translateY(-20px) rotate(5deg);
+          }
+          100% {
+            transform: translateY(0) rotate(0deg);
+          }
+        }
+        .animate-float {
+          animation: float 8s ease-in-out infinite;
+        }
+        .animation-delay-2000 {
+          animation-delay: 2s;
+        }
+      `}</style>
+    </div>
   );
 }
