@@ -16,6 +16,7 @@
     "file-saver": "^2.0.5",
     "framer-motion": "^12.23.12",
     "lucide-react": "^0.525.0",
+    "papaparse": "^5.5.3",
     "phaser": "^3.90.0",
     "react": "^19.1.0",
     "react-chartjs-2": "^5.3.0",

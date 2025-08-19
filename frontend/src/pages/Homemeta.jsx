@@ -67,7 +67,7 @@ function HomeMeta() {
         <div className="text-center mb-16 max-w-4xl mx-auto">
           <div className="flex items-center justify-center gap-3 mb-6">
             <Sparkles className="w-8 h-8 text-cyan-400 animate-pulse" />
-            <h1 className="text-5xl md:text-6xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+            <h1 className="text-5xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
               METAVERSE HOME
             </h1>
             <Sparkles className="w-8 h-8 text-pink-400 animate-pulse" />

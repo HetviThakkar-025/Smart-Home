@@ -23,15 +23,40 @@ export default function QuoteCard() {
   }, []);
 
   return (
-    <div className="w-full h-[250px] max-w-md flex flex-col justify-between backdrop-blur-lg bg-white/5 border border-white/10 hover:scale-[1.03] transition-transform duration-300 ease-out rounded-2xl shadow-2xl p-6 overflow-hidden">
-      <div>
-        <div className="flex items-center mb-3">
-          <Sparkles className="text-yellow-400 mr-2" />
-          <h2 className="text-xl font-semibold">Motivational Quote</h2>
+    <div className="relative w-full h-full flex flex-col justify-between backdrop-blur-xl bg-gradient-to-br from-yellow-500/10 to-orange-500/10 border border-white/10 hover:border-yellow-400/30 rounded-3xl p-6 overflow-hidden transition-all duration-500 group">
+      {/* Glow Effect */}
+      <div className="absolute inset-0 bg-gradient-to-br from-yellow-400/20 to-orange-400/20 opacity-0 group-hover:opacity-100 rounded-3xl blur-xl transition-opacity duration-500"></div>
+
+      {/* Content */}
+      <div className="relative z-10">
+        <div className="flex items-center mb-4">
+          <div className="p-2 bg-gradient-to-br from-yellow-400 to-orange-400 rounded-lg shadow-lg shadow-yellow-500/20 mr-3">
+            <Sparkles className="w-5 h-5 text-white" />
+          </div>
+          <h2 className="text-xl font-semibold text-white">
+            Motivational Quote
+          </h2>
         </div>
-        <p className="text-lg italic text-gray-200 line-clamp-4">"{quote}"</p>
+        <p className="text-lg italic text-gray-200 line-clamp-4 group-hover:text-white transition-colors duration-300">
+          "{quote}"
+        </p>
       </div>
-      <p className="mt-4 text-sm text-gray-400 text-right">— {author}</p>
+
+      {/* Author */}
+      <div className="relative z-10 mt-4">
+        <div className="w-full h-px bg-gradient-to-r from-transparent via-yellow-400/40 to-transparent mb-3"></div>
+        <p className="text-sm text-gray-400 group-hover:text-yellow-200 transition-colors duration-300 text-right">
+          — {author}
+        </p>
+      </div>
+
+      {/* Decorative Elements */}
+      <div className="absolute top-2 right-2 text-yellow-400/10 text-7xl font-serif select-none">
+        "
+      </div>
+      <div className="absolute bottom-2 left-2 text-yellow-400/10 text-7xl font-serif select-none">
+        "
+      </div>
     </div>
   );
 }
