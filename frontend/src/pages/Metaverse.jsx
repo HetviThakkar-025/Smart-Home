@@ -33,7 +33,7 @@ const deviceLabels = {
 };
 
 const ALERT_THRESHOLDS = {
-  DAILY_COST: 200,
+  DAILY_COST: 500,
   POWER_CONSUMPTION: 3000,
 };
 
