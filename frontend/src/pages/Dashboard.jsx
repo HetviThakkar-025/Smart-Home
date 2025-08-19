@@ -111,11 +111,7 @@ function SummaryCard({ title, value, icon, color, trend, subtitle }) {
   );
 }
 
-export default function EnhancedDashboard({
-  powerData,
-  deviceLabels,
-  historicalData,
-}) {
+export default function EnhancedDashboard({ powerData, deviceLabels }) {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("power");
   const [timeRange, setTimeRange] = useState("1h");
@@ -126,13 +122,52 @@ export default function EnhancedDashboard({
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [showDeviceModal, setShowDeviceModal] = useState(false);
   const exportMenuRef = useRef(null);
+  
+  // Ref to hold data points for the current hour
+  const historicalPointsRef = useRef([]);
+  // State to force a re-render when the ref data changes
+  const [reRender, setReRender] = useState(0);
 
-  // Store hourly data points
-  const [hourlyData, setHourlyData] = useState([]);
-  // Store daily data
-  const [dailyData, setDailyData] = useState({});
+  // Function to schedule the next hourly reset
+  const scheduleHourlyReset = () => {
+    const now = new Date();
+    const minutesToNextHour = 60 - now.getMinutes();
+    const secondsToNextHour = (minutesToNextHour * 60) - now.getSeconds();
 
-  // Close export menu when clicking outside
+    const timeout = setTimeout(() => {
+      historicalPointsRef.current = [];
+      setReRender(prev => prev + 1); // Trigger a re-render to clear the graph
+      scheduleHourlyReset(); // Schedule the next reset
+    }, secondsToNextHour * 1000);
+
+    return () => clearTimeout(timeout);
+  };
+
+  // Main effect to handle data updates and hourly reset
+  useEffect(() => {
+    // Schedule the first hourly reset
+    scheduleHourlyReset();
+
+    // Add a new data point to the ref whenever powerData changes
+    if (powerData) {
+      setLoading(false);
+      const newPoint = {
+        timestamp: new Date().toISOString(),
+        power: powerData.power,
+        energy: powerData.energy,
+        cost: powerData.cost,
+        peak: powerData.peak,
+      };
+
+      historicalPointsRef.current = [...historicalPointsRef.current, newPoint];
+      setReRender(prev => prev + 1); // Force a re-render to update UI
+
+      calculateEnergyBreakdown(powerData);
+      calculateDeviceBreakdown(powerData);
+    }
+  }, [powerData]);
+
+  // Handle outside click for export menu
   useEffect(() => {
     function handleClickOutside(event) {
       if (
@@ -146,85 +181,8 @@ export default function EnhancedDashboard({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  useEffect(() => {
-    if (powerData) {
-      setLoading(false);
-      const now = new Date();
-      const currentHour = new Date(now);
-      currentHour.setMinutes(0, 0, 0); // Round down to current hour
-
-      // Update hourly data (only once per hour)
-      setHourlyData((prevData) => {
-        // If no data yet or last data point is from a previous hour
-        if (
-          prevData.length === 0 ||
-          new Date(prevData[prevData.length - 1].timestamp).getHours() < currentHour.getHours() ||
-          new Date(prevData[prevData.length - 1].timestamp).getDate() < currentHour.getDate()
-        ) {
-          const newDataPoint = {
-            timestamp: currentHour.toISOString(),
-            power: powerData.power || 0,
-            energy: powerData.energy || 0,
-            cost: calculateCost(powerData.energy || 0),
-            peak: powerData.peak || 0,
-          };
-          return [...prevData, newDataPoint];
-        } else {
-          // Update the last data point with current values
-          const updatedData = [...prevData];
-          updatedData[updatedData.length - 1] = {
-            ...updatedData[updatedData.length - 1],
-            power: powerData.power || 0,
-            energy: powerData.energy || 0,
-            cost: calculateCost(powerData.energy || 0),
-            peak: powerData.peak || 0,
-          };
-          return updatedData;
-        }
-      });
-
-      // Update daily data
-      setDailyData((prevDailyData) => {
-        const dayKey = now.toISOString().split("T")[0];
-        const newDailyData = { ...prevDailyData };
-        
-        // Initialize or update the day's data
-        if (!newDailyData[dayKey]) {
-          newDailyData[dayKey] = {
-            date: dayKey,
-            energy: powerData.energy || 0,
-            cost: calculateCost(powerData.energy || 0),
-          };
-        } else {
-          // Update only if we have a higher energy reading
-          if (powerData.energy > newDailyData[dayKey].energy) {
-            newDailyData[dayKey] = {
-              date: dayKey,
-              energy: powerData.energy,
-              cost: calculateCost(powerData.energy),
-            };
-          }
-        }
-
-        // Limit to 7 days of data
-        const sortedKeys = Object.keys(newDailyData).sort().reverse();
-        if (sortedKeys.length > 7) {
-          sortedKeys.slice(7).forEach((key) => {
-            delete newDailyData[key];
-          });
-        }
-
-        return newDailyData;
-      });
-
-      calculateEnergyBreakdown(powerData);
-      calculateDeviceBreakdown(powerData);
-    }
-  }, [powerData]);
-
   const calculateEnergyBreakdown = (data) => {
     if (!data?.devices) return;
-
     const breakdown = data.devices.reduce((acc, device) => {
       const type = device.type || "other";
       if (!acc[type]) acc[type] = { power: 0, count: 0 };
@@ -232,63 +190,50 @@ export default function EnhancedDashboard({
       acc[type].count += 1;
       return acc;
     }, {});
-
     setEnergyBreakdown(breakdown);
   };
 
   const calculateDeviceBreakdown = (data) => {
     if (!data?.devices) return;
-
     const breakdown = data.devices.reduce((acc, device) => {
       const name = device.name || device.type;
       if (!acc[name]) acc[name] = { power: 0, state: device.state };
       acc[name].power += device.power || 0;
       return acc;
     }, {});
-
     setDeviceBreakdown(breakdown);
   };
 
   const calculateCost = (kWh) => {
     const tariff = TARIFF_CONFIG[tariffType];
     if (!tariff) return 0;
-
     if (tariffType === "commercial") {
       return kWh * tariff.flatRate + TARIFF_CONFIG.fixedCharges.commercial / 30;
     }
-
     let cost = 0;
     let remainingUnits = kWh;
-
     const slab1Units = Math.min(remainingUnits, tariff.slab1.limit);
     cost += slab1Units * tariff.slab1.rate;
     remainingUnits -= slab1Units;
-
     if (remainingUnits <= 0)
       return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
-
     const slab2Units = Math.min(
       remainingUnits,
       tariff.slab2.limit - tariff.slab1.limit
     );
     cost += slab2Units * tariff.slab2.rate;
     remainingUnits -= slab2Units;
-
     if (remainingUnits <= 0)
       return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
-
     const slab3Units = Math.min(
       remainingUnits,
       tariff.slab3.limit - tariff.slab2.limit
     );
     cost += slab3Units * tariff.slab3.rate;
     remainingUnits -= slab3Units;
-
     if (remainingUnits <= 0)
       return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
-
     cost += remainingUnits * tariff.slab4.rate;
-
     return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
   };
 
@@ -320,53 +265,14 @@ export default function EnhancedDashboard({
     setShowDeviceModal(true);
   };
 
-  const displayData = powerData || {
-    power: 0,
-    energy: 0,
-    cost: 0,
-    peak: 0,
-    devices: [],
-  };
-
-  // Generate sample data if no data is available for charts
-  const generateSampleData = (count) => {
-    const now = new Date();
-    const data = [];
-    for (let i = count - 1; i >= 0; i--) {
-      const timestamp = new Date(now.getTime() - i * 60 * 60 * 1000);
-      data.push({
-        timestamp: timestamp.toISOString(),
-        power: Math.floor(Math.random() * 1000) + 500,
-        energy: Math.random() * 10,
-        cost: Math.random() * 50,
-        peak: Math.floor(Math.random() * 1200) + 600,
-      });
-    }
-    return data;
-  };
-
-  const filteredHourlyData = hourlyData.length > 0 ? hourlyData.filter((d) => {
-    const dataTime = new Date(d.timestamp);
-    const now = new Date();
-    if (timeRange === "1h") {
-      const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-      return dataTime > oneHourAgo;
-    } else if (timeRange === "24h") {
-      const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-      return dataTime > oneDayAgo;
-    } else if (timeRange === "7d") {
-      const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-      return dataTime > sevenDaysAgo;
-    }
-    return true;
-  }) : generateSampleData(timeRange === "1h" ? 12 : timeRange === "24h" ? 24 : 7);
+  const displayData = powerData;
+  const filteredHistoricalData = historicalPointsRef.current;
 
   const exportToCSV = () => {
-    if (hourlyData.length === 0) {
+    if (historicalPointsRef.current.length === 0) {
       showNotification("No data available to export", "warning");
       return;
     }
-
     const headers = [
       "Timestamp",
       "Power (W)",
@@ -374,19 +280,17 @@ export default function EnhancedDashboard({
       "Cost (₹)",
       "Peak Power (W)",
     ];
-    const rows = hourlyData.map((item) => [
+    const rows = historicalPointsRef.current.map((item) => [
       new Date(item.timestamp).toLocaleString(),
       item.power,
       item.energy.toFixed(3),
       item.cost.toFixed(2),
       item.peak,
     ]);
-
     let csvContent = headers.join(",") + "\n";
     rows.forEach((row) => {
       csvContent += row.join(",") + "\n";
     });
-
     const blob = new Blob([csvContent], {
       type: "text/csv;charset=utf-8;",
     });
@@ -395,13 +299,12 @@ export default function EnhancedDashboard({
   };
 
   const exportToExcel = () => {
-    if (hourlyData.length === 0) {
+    if (historicalPointsRef.current.length === 0) {
       showNotification("No data available to export", "warning");
       return;
     }
-
     const worksheet = XLSX.utils.json_to_sheet(
-      hourlyData.map((item) => ({
+      historicalPointsRef.current.map((item) => ({
         Timestamp: new Date(item.timestamp).toLocaleString(),
         "Power (W)": item.power,
         "Energy (kWh)": item.energy.toFixed(3),
@@ -409,7 +312,6 @@ export default function EnhancedDashboard({
         "Peak Power (W)": item.peak,
       }))
     );
-
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "EnergyData");
     const excelBuffer = XLSX.write(workbook, {
@@ -419,12 +321,11 @@ export default function EnhancedDashboard({
     const data = new Blob([excelBuffer], {
       type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     });
-
     saveAs(data, `energy_data_${new Date().toISOString().split("T")[0]}.xlsx`);
     showNotification("Exported to Excel successfully", "success");
   };
 
-  if (loading) {
+  if (loading || !displayData) {
     return (
       <div className="flex items-center justify-center h-full">
         <div className="text-center">
@@ -437,11 +338,11 @@ export default function EnhancedDashboard({
 
   // Chart data configurations
   const powerChartData = {
-    labels: filteredHourlyData.map((d) => formatTimestamp(d.timestamp)),
+    labels: filteredHistoricalData.map((d) => formatTimestamp(d.timestamp)),
     datasets: [
       {
         label: "Power (W)",
-        data: filteredHourlyData.map((d) => d.power),
+        data: filteredHistoricalData.map((d) => d.power),
         borderColor: "#3b82f6",
         backgroundColor: "rgba(59, 130, 246, 0.1)",
         borderWidth: 2,
@@ -452,11 +353,11 @@ export default function EnhancedDashboard({
   };
 
   const costChartData = {
-    labels: filteredHourlyData.map((d) => formatTimestamp(d.timestamp)),
+    labels: filteredHistoricalData.map((d) => formatTimestamp(d.timestamp)),
     datasets: [
       {
         label: "Cost (₹)",
-        data: filteredHourlyData.map((d) => d.cost),
+        data: filteredHistoricalData.map((d) => d.cost),
         borderColor: "#10b981",
         backgroundColor: "rgba(16, 185, 129, 0.1)",
         borderWidth: 2,
@@ -467,12 +368,12 @@ export default function EnhancedDashboard({
   };
 
   const breakdownChartData = {
-    labels: energyBreakdown ? Object.keys(energyBreakdown) : ["light", "fan", "tv", "fridge"],
+    labels: energyBreakdown ? Object.keys(energyBreakdown) : [],
     datasets: [
       {
         data: energyBreakdown
           ? Object.values(energyBreakdown).map((v) => v.power)
-          : [300, 200, 150, 250],
+          : [],
         backgroundColor: [
           "#6366f1",
           "#8b5cf6",
@@ -488,20 +389,31 @@ export default function EnhancedDashboard({
     ],
   };
 
+  // Group data by day for weekly trends
+  const dailyData = historicalPointsRef.current.reduce((acc, item) => {
+    const date = new Date(item.timestamp).toISOString().split("T")[0];
+    if (!acc[date]) {
+      acc[date] = {
+        date,
+        energy: 0,
+        cost: 0,
+        power: [],
+      };
+    }
+    acc[date].energy += item.energy;
+    acc[date].cost += item.cost;
+    acc[date].power.push(item.power);
+    return acc;
+  }, {});
+
   const dailySummaryData = {
-    labels: Object.values(dailyData).length > 0 
-      ? Object.values(dailyData).map((item) => formatDate(item.date))
-      : Array.from({length: 7}, (_, i) => {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          return formatDate(date.toISOString());
-        }).reverse(),
+    labels: Object.values(dailyData).map((item) => formatDate(item.date)),
     datasets: [
       {
         label: "Daily Energy (kWh)",
-        data: Object.values(dailyData).length > 0 
-          ? Object.values(dailyData).map((item) => parseFloat(item.energy.toFixed(2)))
-          : Array.from({length: 7}, () => Math.random() * 10 + 5),
+        data: Object.values(dailyData).map((item) =>
+          parseFloat(item.energy.toFixed(2))
+        ),
         backgroundColor: "rgba(59, 130, 246, 0.7)",
         borderColor: "rgba(59, 130, 246, 1)",
         borderWidth: 1,
@@ -509,9 +421,15 @@ export default function EnhancedDashboard({
     ],
   };
 
-  const powerPercentage =
-    displayData.peak > 0 ? (displayData.power / displayData.peak) * 100 : 0;
+  const currentPower = filteredHistoricalData.length > 0
+    ? filteredHistoricalData[filteredHistoricalData.length - 1].power
+    : 0;
 
+  const peakPower = filteredHistoricalData.length > 0
+    ? Math.max(...filteredHistoricalData.map((d) => d.power))
+    : 0;
+
+  const powerPercentage = peakPower > 0 ? (currentPower / peakPower) * 100 : 0;
   const monthlyCostEstimate = calculateCost((displayData.energy || 0) * 30);
 
   return (
@@ -563,38 +481,7 @@ export default function EnhancedDashboard({
             <option value="commercial">Commercial</option>
           </select>
 
-          <div className="flex gap-1">
-            <button
-              onClick={() => setTimeRange("1h")}
-              className={`px-3 py-1 rounded-md ${
-                timeRange === "1h"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-700 text-gray-300"
-              }`}
-            >
-              1h
-            </button>
-            <button
-              onClick={() => setTimeRange("24h")}
-              className={`px-3 py-1 rounded-md ${
-                timeRange === "24h"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-700 text-gray-300"
-              }`}
-            >
-              24h
-            </button>
-            <button
-              onClick={() => setTimeRange("7d")}
-              className={`px-3 py-1 rounded-md ${
-                timeRange === "7d"
-                  ? "bg-blue-500 text-white"
-                  : "bg-gray-700 text-gray-300"
-              }`}
-            >
-              7d
-            </button>
-          </div>
+          
 
           <div className="relative" ref={exportMenuRef}>
             <button
@@ -645,7 +532,7 @@ export default function EnhancedDashboard({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <SummaryCard
           title="Current Power"
-          value={`${displayData.power} W`}
+          value={`${currentPower} W`}
           icon="⚡"
           color="bg-blue-500"
           subtitle={`${powerPercentage.toFixed(0)}% of peak`}
@@ -659,7 +546,7 @@ export default function EnhancedDashboard({
         />
         <SummaryCard
           title="Peak Power"
-          value={`${displayData.peak} W`}
+          value={`${peakPower} W`}
           icon="📈"
           color="bg-purple-500"
           subtitle={new Date().toLocaleTimeString()}
@@ -917,7 +804,7 @@ export default function EnhancedDashboard({
           </div>
         )}
 
-        {activeTab === "breakdown" && (
+        {activeTab === "breakdown" && energyBreakdown && (
           <div>
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
               Energy Usage Breakdown
@@ -945,8 +832,13 @@ export default function EnhancedDashboard({
                           label: (context) => {
                             const label = context.label || "";
                             const value = context.raw || 0;
-                            const total = context.dataset.data.reduce((a, b) => a + b, 0);
-                            const percentage = total > 0 ? (value / total) * 100 : 0;
+                            const percentage =
+                              (context.dataset.data[context.dataIndex] /
+                                context.dataset.data.reduce(
+                                  (a, b) => a + b,
+                                  0
+                                )) *
+                              100;
                             return `${label}: ${value} W (${percentage.toFixed(
                               1
                             )}%)`;
@@ -959,7 +851,7 @@ export default function EnhancedDashboard({
               </div>
               <div className="lg:w-1/2">
                 <div className="space-y-4">
-                  {energyBreakdown ? Object.entries(energyBreakdown).map(([type, data]) => (
+                  {Object.entries(energyBreakdown).map(([type, data]) => (
                     <div key={type} className="bg-gray-700 rounded-lg p-3">
                       <div className="flex justify-between items-center mb-1">
                         <span className="font-medium text-gray-100 capitalize">
@@ -973,7 +865,7 @@ export default function EnhancedDashboard({
                         <div
                           className="bg-blue-500 h-2 rounded-full"
                           style={{
-                            width: `${(data.power / displayData.power) * 100}%`,
+                            width: `${(data.power / currentPower) * 100}%`,
                           }}
                         ></div>
                       </div>
@@ -982,47 +874,12 @@ export default function EnhancedDashboard({
                           {data.count} device{data.count !== 1 ? "s" : ""}
                         </span>
                         <span>
-                          {((data.power / displayData.power) * 100).toFixed(1)}%
-                          of total
+                          {((data.power / currentPower) * 100).toFixed(1)}% of
+                          total
                         </span>
                       </div>
                     </div>
-                  )) : (
-                    <>
-                      <div className="bg-gray-700 rounded-lg p-3">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium text-gray-100 capitalize">Light</span>
-                          <span className="font-bold text-white">300 W</span>
-                        </div>
-                        <div className="w-full bg-gray-600 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: "30%" }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>4 devices</span>
-                          <span>30% of total</span>
-                        </div>
-                      </div>
-                      <div className="bg-gray-700 rounded-lg p-3">
-                        <div className="flex justify-between items-center mb-1">
-                          <span className="font-medium text-gray-100 capitalize">Fan</span>
-                          <span className="font-bold text-white">200 W</span>
-                        </div>
-                        <div className="w-full bg-gray-600 rounded-full h-2">
-                          <div
-                            className="bg-blue-500 h-2 rounded-full"
-                            style={{ width: "20%" }}
-                          ></div>
-                        </div>
-                        <div className="flex justify-between text-xs text-gray-400 mt-1">
-                          <span>2 devices</span>
-                          <span>20% of total</span>
-                        </div>
-                      </div>
-                    </>
-                  )}
+                  ))}
                 </div>
               </div>
             </div>
@@ -1034,107 +891,100 @@ export default function EnhancedDashboard({
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
               Connected Devices ({displayData.devices?.length || 0})
             </h2>
-            {displayData.devices && displayData.devices.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-gray-700">
-                  <thead className="bg-gray-700">
-                    <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Device
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Power
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Cost/Hr
-                      </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                        Status
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-gray-800 divide-y divide-gray-700">
-                    {displayData.devices.map((device, index) => {
-                      const hourlyCost = calculateCost(device.power / 1000);
-                      return (
-                        <tr
-                          key={index}
-                          className="hover:bg-gray-700 cursor-pointer"
-                          onClick={() => handleDeviceClick(device)}
-                        >
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <div className="flex items-center">
-                              <div className="flex-shrink-0 h-10 w-10 bg-gray-700 rounded-full flex items-center justify-center">
-                                <span className="text-lg">
-                                  {DEVICE_CONFIG[device.type]?.icon || "📱"}
-                                </span>
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-700">
+                <thead className="bg-gray-700">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Device
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Power
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Cost/Hr
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-gray-800 divide-y divide-gray-700">
+                  {displayData.devices?.map((device, index) => {
+                    const hourlyCost = calculateCost(device.power / 1000);
+                    return (
+                      <tr
+                        key={index}
+                        className="hover:bg-gray-700 cursor-pointer"
+                        onClick={() => handleDeviceClick(device)}
+                      >
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <div className="flex-shrink-0 h-10 w-10 bg-gray-700 rounded-full flex items-center justify-center">
+                              <span className="text-lg">
+                                {DEVICE_CONFIG[device.type]?.icon || "📱"}
+                              </span>
+                            </div>
+                            <div className="ml-4">
+                              <div className="text-sm font-medium text-white">
+                                {device.name}
                               </div>
-                              <div className="ml-4">
-                                <div className="text-sm font-medium text-gray-100">
-                                  {device.name || "N/A"}
-                                </div>
-                                <div className="text-sm text-gray-400">
-                                  {device.id}
-                                </div>
+                              <div className="text-sm text-gray-400">
+                                {deviceLabels?.[device.key] || device.type}
                               </div>
                             </div>
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 capitalize">
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span className="px-2 py-1 text-xs rounded-full bg-gray-700 text-gray-300 capitalize">
                             {device.type}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
-                            {device.power} W
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
-                            ₹{hourlyCost.toFixed(2)}
-                          </td>
-                          <td className="px-4 py-3 whitespace-nowrap">
-                            <span
-                              className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                                device.state === "on"
-                                  ? "bg-green-100 text-green-800"
-                                  : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {device.state}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center py-8 text-gray-400">
-                No devices connected
-              </div>
-            )}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
+                          {device.power} W
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap text-sm text-white">
+                          ₹{hourlyCost.toFixed(2)}
+                        </td>
+                        <td className="px-4 py-3 whitespace-nowrap">
+                          <span
+                            className={`px-2 py-1 text-xs rounded-full ${
+                              device.state === "ON"
+                                ? "bg-green-500 text-white"
+                                : device.state === "OFF"
+                                ? "bg-gray-500 text-white"
+                                : "bg-yellow-500 text-white"
+                            }`}
+                          >
+                            {device.state}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
 
         {activeTab === "trends" && (
           <div>
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Daily Energy & Cost Trends (Last 7 Days)
+              Daily Energy Trends
             </h2>
-            <div className="h-64">
+            <div className="h-64 mb-6">
               <Bar
                 data={dailySummaryData}
                 options={{
                   responsive: true,
                   maintainAspectRatio: false,
                   plugins: {
-                    legend: {
-                      display: false,
-                    },
+                    legend: { display: false },
                     tooltip: {
-                      mode: "index",
-                      intersect: false,
-                      backgroundColor: "rgba(31, 41, 55, 0.9)",
                       callbacks: {
                         label: (context) =>
                           `${context.dataset.label}: ${context.raw} kWh`,
@@ -1153,103 +1003,242 @@ export default function EnhancedDashboard({
                       },
                     },
                     x: {
-                      grid: { display: false },
+                      grid: { color: "rgba(55, 65, 81, 0.5)" },
                       ticks: { color: "#9CA3AF" },
                     },
                   },
                 }}
               />
             </div>
-            <div className="mt-4 text-sm text-gray-400 text-center">
-              The graph above shows the total daily energy consumption for the
-              last 7 days.
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-100 mb-3">
+                  Daily Summary
+                </h3>
+                <div className="space-y-3">
+                  {Object.values(dailyData).map((item, index) => {
+                    const cost = calculateCost(item.energy);
+                    return (
+                      <div
+                        key={index}
+                        className="flex justify-between items-center"
+                      >
+                        <span className="text-gray-300">
+                          {formatDate(item.date)}
+                        </span>
+                        <div className="flex items-center gap-4">
+                          <span className="text-gray-400 text-sm">
+                            {item.energy.toFixed(2)} kWh
+                          </span>
+                          <span className="font-medium text-white">
+                            ₹{cost.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+              <div className="bg-gray-700 p-4 rounded-lg">
+                <h3 className="text-lg font-medium text-gray-100 mb-3">
+                  Savings Tips
+                </h3>
+                <ul className="space-y-2 text-gray-300">
+                  <li className="flex items-start">
+                    <span className="text-green-400 mr-2">✓</span>
+                    Turn off lights and fans when not in use
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-400 mr-2">✓</span>
+                    Use energy-efficient appliances (look for BEE 5-star rating)
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-400 mr-2">✓</span>
+                    Set AC temperature to 24°C or higher
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-400 mr-2">✓</span>
+                    Use natural light during daytime
+                  </li>
+                  <li className="flex items-start">
+                    <span className="text-green-400 mr-2">✓</span>
+                    Unplug devices when not in use to avoid phantom load
+                  </li>
+                </ul>
+              </div>
             </div>
           </div>
         )}
       </div>
 
+      <div className="bg-gray-800 rounded-lg p-4">
+        <h2 className="text-xl font-semibold text-gray-100 mb-4">
+          Current Power Usage
+        </h2>
+        <div className="flex flex-col items-center">
+          <div className="relative w-48 h-48 mb-6">
+            <svg
+              className="w-full h-full transform -rotate-90"
+              viewBox="0 0 100 100"
+            >
+              <circle
+                cx="50"
+                cy="50"
+                r="45"
+                fill="none"
+                stroke="rgba(55, 65, 81, 0.5)"
+                strokeWidth="8"
+              />
+              <circle
+                cx="50"
+                cy="50"
+                r="45"
+                fill="none"
+                stroke="#3b82f6"
+                strokeWidth="8"
+                strokeDasharray={`${powerPercentage * 2.83}, 283`}
+                strokeLinecap="round"
+              />
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-3xl font-bold text-white">
+                {currentPower} W
+              </span>
+              <span className="text-gray-400">
+                {powerPercentage.toFixed(0)}% of peak
+              </span>
+            </div>
+          </div>
+          <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
+            <div
+              className="bg-blue-500 h-3 rounded-full"
+              style={{ width: `${powerPercentage}%` }}
+            ></div>
+          </div>
+          <div className="flex justify-between w-full text-xs text-gray-400">
+            <span>0 W</span>
+            <span>{peakPower} W (Peak)</span>
+          </div>
+        </div>
+      </div>
+
       {showDeviceModal && selectedDevice && (
-        <div className="fixed inset-0 bg-gray-900 bg-opacity-75 flex items-center justify-center z-50">
-          <div className="bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 md:mx-0">
-            <div className="flex justify-between items-center mb-4">
-              <h3 className="text-xl font-bold text-gray-100">
-                Device Details
-              </h3>
-              <button
-                onClick={() => setShowDeviceModal(false)}
-                className="text-gray-400 hover:text-white transition-colors"
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-800 rounded-lg max-w-md w-full p-6 relative">
+            <button
+              onClick={() => setShowDeviceModal(false)}
+              className="absolute top-4 right-4 text-gray-400 hover:text-white"
+            >
+              <svg
+                className="w-6 h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
               >
-                <svg
-                  className="w-6 h-6"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth="2"
+                  d="M6 18L18 6M6 6l12 12"
+                ></path>
+              </svg>
+            </button>
+
+            <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
+              <span
+                className={`${
+                  DEVICE_CONFIG[selectedDevice.type]?.color || "bg-gray-500"
+                } w-8 h-8 rounded-full flex items-center justify-center`}
+              >
+                {DEVICE_CONFIG[selectedDevice.type]?.icon || "📱"}
+              </span>
+              {selectedDevice.name}
+            </h2>
+
+            <div className="space-y-4 mt-4">
+              <div className="flex justify-between">
+                <span className="text-gray-400">Type:</span>
+                <span className="text-white capitalize">
+                  {selectedDevice.type}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Power Consumption:</span>
+                <span className="text-white">{selectedDevice.power} W</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Hourly Cost:</span>
+                <span className="text-white">
+                  ₹{calculateCost(selectedDevice.power / 1000).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Daily Cost (24hrs):</span>
+                <span className="text-white">
+                  ₹
+                  {(calculateCost(selectedDevice.power / 1000) * 24).toFixed(2)}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-400">Status:</span>
+                <span
+                  className={`px-2 py-1 text-xs rounded-full ${
+                    selectedDevice.state === "ON"
+                      ? "bg-green-500 text-white"
+                      : selectedDevice.state === "OFF"
+                      ? "bg-gray-500 text-white"
+                      : "bg-yellow-500 text-white"
+                  }`}
                 >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth="2"
-                    d="M6 18L18 6M6 6l12 12"
-                  ></path>
-                </svg>
-              </button>
-            </div>
-            <div className="space-y-4">
-              <div className="flex items-center space-x-4">
-                <div className="w-16 h-16 rounded-full flex items-center justify-center text-3xl bg-gray-700">
-                  {DEVICE_CONFIG[selectedDevice.type]?.icon || "📱"}
-                </div>
-                <div>
-                  <h4 className="text-lg font-medium text-white">
-                    {selectedDevice.name || "N/A"}
-                  </h4>
-                  <p className="text-sm text-gray-400">
-                    ID: {selectedDevice.id}
-                  </p>
-                </div>
+                  {selectedDevice.state}
+                </span>
               </div>
-              <div className="grid grid-cols-2 gap-4 text-sm text-gray-400">
-                <div className="flex flex-col">
-                  <span className="font-medium">Type</span>
-                  <span className="text-white capitalize">
-                    {selectedDevice.type}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-medium">Power</span>
-                  <span className="text-white">
-                    {selectedDevice.power} W
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-medium">Status</span>
-                  <span className="text-white capitalize">
-                    {selectedDevice.state}
-                  </span>
-                </div>
-                <div className="flex flex-col">
-                  <span className="font-medium">Cost/Hr</span>
-                  <span className="text-white">
-                    ₹{calculateCost(selectedDevice.power / 1000).toFixed(2)}
-                  </span>
-                </div>
-              </div>
-              {selectedDevice.description && (
-                <div className="flex flex-col">
-                  <span className="font-medium text-gray-400">
-                    Description
-                  </span>
-                  <p className="text-white">{selectedDevice.description}</p>
-                </div>
-              )}
             </div>
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => setShowDeviceModal(false)}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-              >
-                Close
-              </button>
+
+            <div className="mt-6 pt-4 border-t border-gray-700">
+              <h3 className="text-lg font-medium text-gray-100 mb-2">
+                Energy Saving Tips
+              </h3>
+              <ul className="text-sm text-gray-300 space-y-2">
+                {selectedDevice.type === "light" && (
+                  <>
+                    <li>• Switch to LED bulbs which use 75% less energy</li>
+                    <li>• Turn off lights when not in use</li>
+                    <li>• Use natural light during daytime</li>
+                  </>
+                )}
+                {selectedDevice.type === "fan" && (
+                  <>
+                    <li>• Use ceiling fans instead of AC when possible</li>
+                    <li>• Turn off fans when leaving the room</li>
+                    <li>• Clean fan blades regularly for better efficiency</li>
+                  </>
+                )}
+                {selectedDevice.type === "ac" && (
+                  <>
+                    <li>• Set temperature to 24°C or higher</li>
+                    <li>• Use timer function to avoid overnight usage</li>
+                    <li>• Ensure proper insulation of the room</li>
+                  </>
+                )}
+                {selectedDevice.type === "fridge" && (
+                  <>
+                    <li>
+                      • Keep refrigerator well-stocked (but not overcrowded)
+                    </li>
+                    <li>• Ensure proper door seals</li>
+                    <li>
+                      • Set temperature between 3-5°C for fridge, -18°C for
+                      freezer
+                    </li>
+                  </>
+                )}
+                {!["light", "fan", "ac", "fridge"].includes(
+                  selectedDevice.type
+                ) && (
+                  <li>Unplug when not in use to avoid standby power consumption</li>
+                )}
+              </ul>
             </div>
           </div>
         </div>
