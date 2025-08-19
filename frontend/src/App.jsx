@@ -216,6 +216,7 @@ function App() {
           <Route path="/Homemeta" element={<Homemeta />} />
           <Route path="/Metaverse/1bhk" element={<Meta1bhk />} />
           <Route path="/Metaverse/3bhk" element={<Meta3bhk />} />
+          <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/assistant" element={<SmartAssistant />} />
           <Route path="/assistant/notes" element={<NotesWall />} />
           <Route path="/assistant/morning-brief" element={<MorningBrief />} />
