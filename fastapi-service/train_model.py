@@ -1,4 +1,4 @@
-# train_model.py
+# train_model.py (notes)
 import pandas as pd
 from sklearn.linear_model import LogisticRegression
 from sklearn.model_selection import train_test_split

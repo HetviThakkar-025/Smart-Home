@@ -10,7 +10,6 @@ import Meta1bhk from "./pages/Meta1bhk";
 import Homemeta from "./pages/Homemeta";
 import Dashboard from "./pages/Dashboard";
 import Meta3bhk from "./pages/Meta3bhk";
-import AnalyticsPage from "./pages/AnalyticsPage";
 import SmartAssistant from "./pages/SmartAssistant";
 import NotesWall from "./pages/NotesWall";
 import MorningBrief from "./pages/MorningBrief";
@@ -217,7 +216,6 @@ function App() {
           <Route path="/Homemeta" element={<Homemeta />} />
           <Route path="/Metaverse/1bhk" element={<Meta1bhk />} />
           <Route path="/Metaverse/3bhk" element={<Meta3bhk />} />
-          <Route path="/analytics" element={<AnalyticsPage />} />
           <Route path="/assistant" element={<SmartAssistant />} />
           <Route path="/assistant/notes" element={<NotesWall />} />
           <Route path="/assistant/morning-brief" element={<MorningBrief />} />
