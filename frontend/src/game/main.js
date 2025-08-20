@@ -131,13 +131,18 @@ class SmartHomeScene extends Phaser.Scene {
         key: deviceKey,
       });
 
-    const label = this.add.text(x, y + 40, `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`, {
-      fontFamily: 'Arial',
-      fontSize: '14px',
-      color: '#ffffff',
-      backgroundColor: '#000000',
-      padding: { x: 5, y: 2 }
-    })
+    const label = this.add.text(
+      x,
+      y + 40,
+      `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`,
+      {
+        fontFamily: "Arial",
+        fontSize: "20px", // Increased font size
+        color: initialState ? "#10B981" : "#EF4444", // Green for ON, Red for OFF
+        backgroundColor: "#000000",
+        padding: { x: 5, y: 2 },
+      }
+    )
     .setOrigin(0.5)
     .setDepth(1000);
 
@@ -183,12 +188,14 @@ class SmartHomeScene extends Phaser.Scene {
         scale: 0.8,
         duration: 200,
         onComplete: () => {
-          const labelIndex = this.deviceLabels.findIndex(item => item.device === device);
+          const labelIndex = this.deviceLabels.findIndex(
+            (item) => item.device === device
+          );
           if (labelIndex !== -1) {
             this.deviceLabels[labelIndex].label.destroy();
             this.deviceLabels.splice(labelIndex, 1);
           }
-          
+
           this.devices = this.devices.filter((d) => d !== device);
           [device, deleteBtn].forEach((el) => el && el.destroy());
           this.updatePowerConsumption();
@@ -200,8 +207,8 @@ class SmartHomeScene extends Phaser.Scene {
     device.on("drag", (pointer, dragX, dragY) => {
       device.setPosition(dragX, dragY);
       deleteBtn.setPosition(dragX + 30, dragY - 30);
-      
-      const labelObj = this.deviceLabels.find(item => item.device === device);
+
+      const labelObj = this.deviceLabels.find((item) => item.device === device);
       if (labelObj) {
         labelObj.label.setPosition(dragX, dragY + 40);
       }
@@ -227,9 +234,10 @@ class SmartHomeScene extends Phaser.Scene {
     const newState = !device.getData("state");
     device.setData("state", newState);
 
-    const labelObj = this.deviceLabels.find(item => item.device === device);
+    const labelObj = this.deviceLabels.find((item) => item.device === device);
     if (labelObj) {
       labelObj.label.setText(`${config.label}: ${newState ? "ON" : "OFF"}`);
+      labelObj.label.setColor(newState ? "#10B981" : "#EF4444"); // Set color based on state
     }
 
     if (config.type === "fan" && device.texture?.key) {
@@ -254,7 +262,7 @@ class SmartHomeScene extends Phaser.Scene {
   updatePowerConsumption() {
     const now = Date.now();
     const currentDate = new Date().toDateString();
-    
+
     // Reset daily metrics if date changed
     if (currentDate !== this.currentDate) {
       this.dailyEnergy = 0;
@@ -345,16 +353,16 @@ class SmartHomeScene extends Phaser.Scene {
 
   saveFullState() {
     const state = {
-      devices: this.devices.map(device => ({
+      devices: this.devices.map((device) => ({
         key: device.texture.key,
         x: device.x,
         y: device.y,
-        state: device.getData("state")
+        state: device.getData("state"),
       })),
-      lamps: this.lamps.map(lamp => ({
+      lamps: this.lamps.map((lamp) => ({
         x: lamp.x,
         y: lamp.y,
-        state: lamp.getData("state")
+        state: lamp.getData("state"),
       })),
       instantPower: this.instantPower,
       dailyEnergy: this.dailyEnergy,
@@ -362,7 +370,7 @@ class SmartHomeScene extends Phaser.Scene {
       peakPower: this.peakPower,
       lastUpdateTime: this.lastUpdateTime,
       lastSavedTime: this.lastSavedTime,
-      currentDate: this.currentDate
+      currentDate: this.currentDate,
     };
 
     localStorage.setItem(this.gameStateKey, JSON.stringify(state));
@@ -374,7 +382,7 @@ class SmartHomeScene extends Phaser.Scene {
 
     try {
       const state = JSON.parse(savedState);
-      
+
       // Check if we need to reset daily metrics (new day)
       const today = new Date().toDateString();
       if (state.currentDate !== today) {
@@ -382,7 +390,7 @@ class SmartHomeScene extends Phaser.Scene {
         state.dailyCost = 0;
         state.peakPower = 0;
       }
-      
+
       if (state.lamps && this.lamps.length > 0) {
         state.lamps.forEach((savedLamp, index) => {
           if (this.lamps[index]) {
@@ -392,11 +400,11 @@ class SmartHomeScene extends Phaser.Scene {
       }
 
       if (state.devices) {
-        state.devices.forEach(savedDevice => {
+        state.devices.forEach((savedDevice) => {
           this.addDevice(
-            savedDevice.key, 
-            savedDevice.x, 
-            savedDevice.y, 
+            savedDevice.key,
+            savedDevice.x,
+            savedDevice.y,
             savedDevice.state
           );
         });
@@ -409,7 +417,6 @@ class SmartHomeScene extends Phaser.Scene {
       this.lastUpdateTime = state.lastUpdateTime || Date.now();
       this.lastSavedTime = state.lastSavedTime || 0;
       this.currentDate = state.currentDate || today;
-
     } catch (error) {
       console.error("Error loading game state:", error);
     }
@@ -423,13 +430,16 @@ class SmartHomeScene extends Phaser.Scene {
       peak: this.peakPower,
       devices: deviceDetails,
       timestamp: new Date().toISOString(),
-      date: this.currentDate
+      date: this.currentDate,
     };
 
-    window.parent.postMessage({
-      type: "POWER_UPDATE",
-      payload: payload
-    }, "*");
+    window.parent.postMessage(
+      {
+        type: "POWER_UPDATE",
+        payload: payload,
+      },
+      "*"
+    );
   }
 
   async sendToBackend(deviceDetails) {
@@ -441,22 +451,22 @@ class SmartHomeScene extends Phaser.Scene {
         peak: this.peakPower,
         devices: deviceDetails,
         timestamp: new Date().toISOString(),
-        date: this.currentDate
+        date: this.currentDate,
       };
 
-      const response = await fetch('/api/power', {
-        method: 'POST',
+      const response = await fetch("/api/power", {
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
-        console.error('Failed to save power data:', await response.text());
+        console.error("Failed to save power data:", await response.text());
       }
     } catch (error) {
-      console.error('Error sending data to backend:', error);
+      console.error("Error sending data to backend:", error);
     }
   }
 }
@@ -470,8 +480,8 @@ const config = {
   backgroundColor: "#222",
   scale: {
     mode: Phaser.Scale.RESIZE,
-    autoCenter: Phaser.Scale.CENTER_BOTH
-  }
+    autoCenter: Phaser.Scale.CENTER_BOTH,
+  },
 };
 
 window.addEventListener("load", () => {

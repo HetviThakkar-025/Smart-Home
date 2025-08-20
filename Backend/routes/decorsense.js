@@ -20,7 +20,7 @@ router.post("/analyze", upload.single("roomImage"), async (req, res) => {
 
     const colabEndpoint =
       process.env.COLAB_API_URL ||
-      "https://25965c4b71c4.ngrok-free.app/analyze";
+      "https://c892a820d6cd.ngrok-free.app/analyze";
 
     const formData = new FormData();
     formData.append("file", req.file.buffer, {

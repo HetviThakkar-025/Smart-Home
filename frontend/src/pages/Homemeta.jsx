@@ -34,8 +34,18 @@ function HomeMeta() {
       color: "from-orange-400 to-red-500",
       shadow: "shadow-orange-500/30",
       description: "Luxury Living",
-      link: "/Metaverse/3bhk",
+      link: "/3bhk-home",
       features: ["Premium Automation", "Smart Security", "VR Integration"],
+    },
+    {
+      id: "customize",
+      name: "Customize",
+      icon: <Settings className="w-8 h-8" />,
+      color: "from-purple-400 to-pink-500",
+      shadow: "shadow-purple-500/30",
+      description: "Design Your Own",
+      link: "/Customization",
+      features: ["Fully Customizable", "3D Editor", "AI Design Assistant"],
     },
   ];
 
@@ -43,9 +53,9 @@ function HomeMeta() {
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 relative overflow-hidden pt-24 pb-16">
       {/* Animated Background Elements */}
       <div className="absolute inset-0 overflow-hidden">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-blue-500/10 to-cyan-500/10 rounded-full blur-3xl animate-float"></div>
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-full blur-3xl animate-float"></div>
         <div className="absolute top-3/4 right-1/4 w-96 h-96 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-full blur-3xl animate-float animation-delay-2000"></div>
-        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-gradient-to-r from-cyan-500/10 to-blue-500/10 rounded-full blur-3xl animate-float animation-delay-4000"></div>
+        <div className="absolute bottom-1/4 left-1/3 w-80 h-80 bg-gradient-to-r from-pink-500/10 to-rose-500/10 rounded-full blur-3xl animate-float animation-delay-4000"></div>
       </div>
 
       {/* Grid Pattern Overlay */}
@@ -62,15 +72,31 @@ function HomeMeta() {
         ></div>
       </div>
 
+      {/* Floating Icons */}
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
+        <div className="absolute top-16 left-8 text-8xl animate-bounce animation-delay-100">
+          🏠
+        </div>
+        <div className="absolute bottom-24 right-10 text-8xl animate-bounce animation-delay-300">
+          🛋️
+        </div>
+        <div className="absolute top-1/2 left-1/4 text-7xl animate-bounce animation-delay-500">
+          🌟
+        </div>
+        <div className="absolute bottom-40 left-1/3 text-6xl animate-bounce animation-delay-700">
+          🎮
+        </div>
+      </div>
+
       <div className="relative z-10 px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-16 max-w-4xl mx-auto">
-          <div className="flex items-center justify-center gap-3 mb-6">
-            <Sparkles className="w-8 h-8 text-cyan-400 animate-pulse" />
-            <h1 className="text-5xl md:text-5xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Sparkles className="w-12 h-12 text-cyan-400 animate-pulse" />
+            <h1 className="text-6xl font-bold bg-gradient-to-r from-cyan-400 via-purple-400 to-pink-400 bg-clip-text text-transparent">
               METAVERSE HOME
             </h1>
-            <Sparkles className="w-8 h-8 text-pink-400 animate-pulse" />
+            <Sparkles className="w-12 h-12 text-pink-400 animate-pulse" />
           </div>
           <p className="text-xl text-white/70 font-light mb-6">
             Enter Your Virtual Reality • Design Your Digital Space
@@ -79,9 +105,8 @@ function HomeMeta() {
         </div>
 
         {/* Options Grid */}
-        {/* Options Grid */}
         <div className="max-w-7xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {options.map((option) => (
               <div
                 key={option.id}
@@ -131,7 +156,7 @@ function HomeMeta() {
                         {option.features.map((feature, index) => (
                           <li key={index} className="flex items-center">
                             <div className="w-2 h-2 bg-gradient-to-r from-cyan-400 to-pink-400 rounded-full mr-2"></div>
-                            <span className="text-white/70 text-sm">
+                            <span className="text-white/70 text-xs">
                               {feature}
                             </span>
                           </li>
@@ -181,6 +206,14 @@ function HomeMeta() {
             </div>
           </div>
         )}
+
+        {/* Footer */}
+        <div className="text-center mt-16 pt-8 border-t border-white/10">
+          <p className="text-white/40 text-sm">
+            Powered by Virtual Reality Technology • MetaHome ©{" "}
+            {new Date().getFullYear()}
+          </p>
+        </div>
       </div>
 
       {/* Custom animations */}
@@ -196,6 +229,15 @@ function HomeMeta() {
             transform: translateY(0) rotate(0deg);
           }
         }
+        @keyframes bounce {
+          0%,
+          100% {
+            transform: translateY(0);
+          }
+          50% {
+            transform: translateY(-20px);
+          }
+        }
         @keyframes fade-in {
           0% {
             opacity: 0;
@@ -209,14 +251,29 @@ function HomeMeta() {
         .animate-float {
           animation: float 8s ease-in-out infinite;
         }
+        .animate-bounce {
+          animation: bounce 3s ease-in-out infinite;
+        }
+        .animate-fade-in {
+          animation: fade-in 0.5s ease-out;
+        }
+        .animation-delay-100 {
+          animation-delay: 0.1s;
+        }
+        .animation-delay-300 {
+          animation-delay: 0.3s;
+        }
+        .animation-delay-500 {
+          animation-delay: 0.5s;
+        }
+        .animation-delay-700 {
+          animation-delay: 0.7s;
+        }
         .animation-delay-2000 {
           animation-delay: 2s;
         }
         .animation-delay-4000 {
           animation-delay: 4s;
-        }
-        .animate-fade-in {
-          animation: fade-in 0.5s ease-out;
         }
       `}</style>
     </div>

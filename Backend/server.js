@@ -2,8 +2,10 @@ const dotenv = require("dotenv");
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
+const path=require('path')
+const customizationRoutes = require('./routes/customization');
 const authRoutes = require("./routes/authRoutes");
-const analyticsRoutes = require("./routes/analytics");
+const analyticsRoutes = require("./routes/analytics");  
 const notesRoutes = require("./routes/notes");
 const quoteRoutes = require("./routes/quoteRoutes");
 const weatherRoutes = require("./routes/weather");
@@ -14,6 +16,7 @@ const smartKitchenRoutes = require("./routes/smartKitchen");
 const powerRoutes = require("./routes/powerRoutes");
 const errorHandler = require("./middleware/errorHandler");
 const decorsenseRoutes = require("./routes/decorsense");
+const Customization = require('./models/Customization');
 
 dotenv.config();
 
@@ -22,6 +25,10 @@ const app = express();
 // Middleware
 app.use(cors());
 app.use(express.json());
+app.use(customizationRoutes);
+
+// Static middleware to serve uploaded images
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Check Mongo URI before connecting
 if (!process.env.MONGO_URI) {
@@ -69,6 +76,17 @@ app.post("/api/power", async (req, res) => {
 // Test Route
 app.get("/", (req, res) => {
   res.send("Smart Home Backend is running 🚀");
+});
+
+app.post('/api/customization', async (req, res) => {
+  try {
+    const data = req.body;
+    const customization = new Customization(data);
+    await customization.save();
+    res.status(200).json({ message: 'Customization saved!' });
+  } catch (err) {
+    res.status(500).json({ error: 'Failed to save customization', details: err });
+  }
 });
 
 app.use("/api/auth", authRoutes);

@@ -16,6 +16,7 @@ import MorningBrief from "./pages/MorningBrief";
 import PetCare from "./pages/PetCare";
 import SmartKitchen from "./pages/SmartKitchen";
 import DecorSense from "./pages/DecorSense";
+import Customize from "./pages/Customize";
 
 const DEVICE_LABELS = {
   light: "Tube Light",
@@ -213,6 +214,7 @@ function App() {
               />
             }
           />
+          <Route path="/Customization" element={<Customize/>}></Route>
           <Route path="/Homemeta" element={<Homemeta />} />
           <Route path="/Metaverse/1bhk" element={<Meta1bhk />} />
           <Route path="/Metaverse/3bhk" element={<Meta3bhk />} />
