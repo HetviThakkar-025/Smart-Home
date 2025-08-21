@@ -1,6 +1,6 @@
 import { motion, AnimatePresence } from "framer-motion";
 
-const SuccessModal = ({ show, message, onClose }) => {
+const SuccessModal = ({ show, message, onClose, userName }) => {
   return (
     <AnimatePresence>
       {show && (

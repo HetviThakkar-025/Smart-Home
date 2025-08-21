@@ -99,16 +99,19 @@ const Customize = () => {
     try {
       const submitData = new FormData();
 
+      // get logged-in user's id
+      const userId = localStorage.getItem("userId");
+      submitData.append("userId", userId);
+
       Object.keys(formData).forEach((key) => {
-        if (key === "appliances") {
-          submitData.append(key, JSON.stringify(formData[key]));
-        } else if (key === "customAppliances") {
+        if (key === "appliances" || key === "customAppliances") {
           submitData.append(key, JSON.stringify(formData[key]));
         } else if (key === "designImages") {
-          formData[key].forEach((file, index) => {
-            submitData.append(`designImages`, file);
+          formData[key].forEach((file) => {
+            submitData.append("designImages", file);
           });
-        } else {
+        } else if (key !== "username") {
+          // 🚨 don't send username anymore
           submitData.append(key, formData[key]);
         }
       });
@@ -121,8 +124,8 @@ const Customize = () => {
 
       setShowModal(true);
 
+      // reset form (without username field now)
       setFormData({
-        username: "",
         houseType: "1BHK",
         appliances: [],
         customAppliances: [],
@@ -177,28 +180,6 @@ const Customize = () => {
           transition={{ delay: 0.2 }}
           className="bg-white/5 backdrop-blur-xl border border-white/10 rounded-3xl p-8"
         >
-          {/* Personal Information */}
-          <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg shadow-lg shadow-blue-500/20">
-                <Sparkles className="w-5 h-5 text-white" />
-              </div>
-              <h3 className="text-xl font-semibold text-white">
-                Personal Information
-              </h3>
-            </div>
-            <label className="block text-gray-300 mb-2">User Name *</label>
-            <input
-              type="text"
-              name="username"
-              value={formData.userId}
-              onChange={handleChange}
-              className="w-full p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              placeholder="Enter your user name"
-              required
-            />
-          </div>
-
           {/* Property Details */}
           <div className="mb-8">
             <div className="flex items-center gap-3 mb-4">

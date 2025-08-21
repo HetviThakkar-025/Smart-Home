@@ -32,7 +32,7 @@ router.post(
   async (req, res) => {
     try {
       const {
-        username,
+        userId,
         houseType,
         appliances,
         customAppliances,
@@ -44,7 +44,7 @@ router.post(
       } = req.body;
 
       const newCustomization = new Customization({
-        username,
+        userId,
         houseType,
         appliances: JSON.parse(appliances || "[]"),
         customAppliances: JSON.parse(customAppliances || "[]"),
