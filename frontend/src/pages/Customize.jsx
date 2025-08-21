@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
-import { Home, Plus, Trash2, Upload, Save, Sparkles } from "lucide-react";
+import { Home, Plus, Trash2, Upload, Save, Sparkles, Cpu } from "lucide-react";
 import SuccessModal from "./SuccessModal";
 
 const Customize = () => {
@@ -230,16 +230,16 @@ const Customize = () => {
 
           {/* Appliances */}
           <div className="mb-8">
-            <div className="flex items-center gap-3 mb-4">
+            {/* <div className="flex items-center gap-3 mb-4">
               <div className="p-2 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg shadow-lg shadow-green-500/20">
                 <div className="text-white">⚡</div>
               </div>
               <h3 className="text-xl font-semibold text-white">
                 Appliances & Electronics
               </h3>
-            </div>
+            </div> */}
 
-            <label className="block text-gray-300 mb-2">
+            {/* <label className="block text-gray-300 mb-2">
               Select Common Appliances:
             </label>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -266,13 +266,21 @@ const Customize = () => {
                   <span className="text-white text-sm">{item}</span>
                 </label>
               ))}
-            </div>
+            </div> */}
 
             <div className="border-t border-white/10 pt-6">
               <div className="flex justify-between items-center mb-4">
-                <label className="block text-gray-300">
-                  Custom Appliances:
-                </label>
+                {/* Left side with icon + label */}
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-gradient-to-r from-indigo-600 to-blue-600 rounded-lg shadow-lg shadow-indigo-500/30">
+                    <Cpu className="w-5 h-5 text-white" />
+                  </div>
+                  <label className="text-xl font-semibold text-white">
+                    Custom Appliances
+                  </label>
+                </div>
+
+                {/* Right side with button */}
                 <motion.button
                   type="button"
                   onClick={addCustomAppliance}
@@ -284,7 +292,6 @@ const Customize = () => {
                   Add Appliance
                 </motion.button>
               </div>
-
               {formData.customAppliances.map((appliance, index) => (
                 <div
                   key={index}
