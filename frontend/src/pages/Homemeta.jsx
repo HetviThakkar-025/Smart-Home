@@ -34,7 +34,7 @@ function HomeMeta() {
       color: "from-orange-400 to-red-500",
       shadow: "shadow-orange-500/30",
       description: "Luxury Living",
-      link: "/3bhk-home",
+      link: "/Metaverse/3bhk",
       features: ["Premium Automation", "Smart Security", "VR Integration"],
     },
     {
