@@ -2,10 +2,11 @@ import React, { useState } from "react";
 import axios from "axios";
 import { motion } from "framer-motion";
 import { Home, Plus, Trash2, Upload, Save, Sparkles } from "lucide-react";
+import SuccessModal from "./SuccessModal";
 
 const Customize = () => {
   const [formData, setFormData] = useState({
-    userId: "",
+    username: "",
     houseType: "1BHK",
     appliances: [],
     customAppliances: [],
@@ -19,6 +20,7 @@ const Customize = () => {
 
   const [previewImages, setPreviewImages] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [showModal, setShowModal] = useState(false);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
@@ -117,10 +119,10 @@ const Customize = () => {
         },
       });
 
-      alert("Customization saved successfully!");
+      setShowModal(true);
 
       setFormData({
-        userId: "",
+        username: "",
         houseType: "1BHK",
         appliances: [],
         customAppliances: [],
@@ -185,14 +187,14 @@ const Customize = () => {
                 Personal Information
               </h3>
             </div>
-            <label className="block text-gray-300 mb-2">User ID *</label>
+            <label className="block text-gray-300 mb-2">User Name *</label>
             <input
               type="text"
-              name="userId"
+              name="username"
               value={formData.userId}
               onChange={handleChange}
               className="w-full p-3 rounded-lg bg-white/10 backdrop-blur-sm border border-white/10 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-              placeholder="Enter your unique user ID"
+              placeholder="Enter your user name"
               required
             />
           </div>
@@ -531,6 +533,12 @@ const Customize = () => {
           animation-delay: 2s;
         }
       `}</style>
+
+      <SuccessModal
+        show={showModal}
+        message="Your personalized smart home design has been received. We’ll provide your virtual home soon. For queries, contact us at support@metahome.com"
+        onClose={() => setShowModal(false)}
+      />
     </div>
   );
 };

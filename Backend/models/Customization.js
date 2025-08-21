@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 
 const CustomizationSchema = new mongoose.Schema({
-  userId: { type: String, required: true },
+  username: { type: String, required: true },
   houseType: { type: String, enum: ['1BHK', '2BHK', '3BHK'], required: true },
   appliances: [{ type: String }],
   customAppliances: [
