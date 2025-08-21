@@ -230,44 +230,6 @@ const Customize = () => {
 
           {/* Appliances */}
           <div className="mb-8">
-            {/* <div className="flex items-center gap-3 mb-4">
-              <div className="p-2 bg-gradient-to-r from-green-600 to-teal-600 rounded-lg shadow-lg shadow-green-500/20">
-                <div className="text-white">⚡</div>
-              </div>
-              <h3 className="text-xl font-semibold text-white">
-                Appliances & Electronics
-              </h3>
-            </div> */}
-
-            {/* <label className="block text-gray-300 mb-2">
-              Select Common Appliances:
-            </label>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-              {[
-                "TV",
-                "Refrigerator",
-                "Washing Machine",
-                "AC",
-                "Microwave",
-                "Dishwasher",
-                "Water Heater",
-              ].map((item) => (
-                <label
-                  key={item}
-                  className="flex items-center p-2 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-all cursor-pointer"
-                >
-                  <input
-                    type="checkbox"
-                    value={item}
-                    checked={formData.appliances.includes(item)}
-                    onChange={handleApplianceChange}
-                    className="mr-2"
-                  />
-                  <span className="text-white text-sm">{item}</span>
-                </label>
-              ))}
-            </div> */}
-
             <div className="border-t border-white/10 pt-6">
               <div className="flex justify-between items-center mb-4">
                 {/* Left side with icon + label */}
