@@ -150,13 +150,18 @@ class room2bhk extends Phaser.Scene {
         key: deviceKey,
       });
 
-    const label = this.add.text(x, y + 40, `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`, {
-      fontFamily: 'Arial',
-      fontSize: '14px',
-      color: '#ffffff',
-      backgroundColor: '#000000',
-      padding: { x: 5, y: 2 }
-    })
+     const label = this.add.text(
+      x,
+      y + 40,
+      `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`,
+      {
+        fontFamily: "Arial",
+        fontSize: "20px", // Increased font size
+        color: initialState ? "#10B981" : "#EF4444", // Green for ON, Red for OFF
+        backgroundColor: "#000000",
+        padding: { x: 5, y: 2 },
+      }
+    )
     .setOrigin(0.5)
     .setDepth(1000);
 
@@ -492,7 +497,7 @@ const config = {
     autoCenter: Phaser.Scale.CENTER_BOTH
   }
 };
-
+  
 window.addEventListener("load", () => {
   const game = new Phaser.Game(config);
   window.gameScene = game.scene.getScene("room2bhk");

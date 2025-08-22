@@ -29,6 +29,7 @@ const DEVICE_CONFIG = {
   router: { icon: "📶", color: "bg-green-500", wattage: 10, alwaysOn: true }
 };
 
+// Updated for Gujarat, India (Torrent Power approximate rates)
 const TARIFF_CONFIG = {
   residential: {
     fixedCharges: 110, // ₹ per month
@@ -135,7 +136,6 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
   const [storedHistoricalData, setStoredHistoricalData] = useState([]);
   const exportMenuRef = useRef(null);
 
-  // Load data from localStorage on initial render
   useEffect(() => {
     const storedData = getStoredData('energyDashboardData');
     const storedHistory = getStoredData('energyHistoricalData', []);
@@ -145,8 +145,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
     setLoading(false);
   }, []);
 
-  // Process and save new data when 'powerData' is received
-  useEffect(() => {
+useEffect(() => {
     if (powerData) {
       const cleanedPowerData = cleanData(powerData);
       
@@ -185,6 +184,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
           }
         ];
         
+        // Keep only the last 7 days of data
         const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
         const filteredData = newHistoricalData.filter(item => 
           new Date(item.timestamp) > oneWeekAgo
@@ -195,6 +195,8 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
       }
     }
   }, [powerData, storedHistoricalData]);
+
+  
 
 
   // Close export menu when clicking outside
@@ -321,7 +323,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
   const displayHistoricalData = storedHistoricalData.length > 0 ? storedHistoricalData : 
       (cleanData(historicalData) || []);
   
-  // Hardcoded to show data for the current day only
+  // This function now exclusively filters for the current day
   const getFilteredHistoricalData = () => {
     const now = new Date();
     const todayStart = new Date(now);
@@ -333,15 +335,16 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
     });
   };
 
-  const filteredHistoricalData = getFilteredHistoricalData();
+  const filteredHistoricalData = storedHistoricalData.length > 0 ? storedHistoricalData : 
+    (cleanData(historicalData) || []);
 
-  // Export functions, moved to be accessible
-  const exportToCSV = (range = 'current') => {
+  // Export functions
+  const exportToCSV = (range = 'all') => {
     let dataToExport = [];
     const now = new Date();
     
-    if (range === 'current') {
-      dataToExport = filteredHistoricalData;
+    if (range === 'all') {
+      dataToExport = displayHistoricalData;
     } else if (range === 'today') {
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
@@ -463,7 +466,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
   };
 
   // Group data by day for weekly trends
-  const dailyData = filteredHistoricalData.reduce((acc, item) => {
+  const dailyData = displayHistoricalData.reduce((acc, item) => {
     const date = item.timestamp.split('T')[0];
     if (!acc[date]) {
       acc[date] = {
@@ -575,36 +578,12 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
             <div id="exportMenu" className="hidden absolute right-0 mt-1 w-48 bg-gray-800 rounded-md shadow-lg z-10 border border-gray-700">
               <div className="py-1">
                 <button
-                  onClick={() => exportToCSV('current')}
+                  onClick={() => exportToCSV('all')}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
                 >
-                  Export All Data (CSV)
+                  Export  Data (CSV)
                 </button>
-                <button
-                  onClick={() => exportToCSV('today')}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-                >
-                  Export Today (CSV)
-                </button>
-                <button
-                  onClick={() => exportToCSV('week')}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-                >
-                  Export Week (CSV)
-                </button>
-                <button
-                  onClick={() => exportToCSV('month')}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-                >
-                  Export Month (CSV)
-                </button>
-                <div className="border-t border-gray-700"></div>
-                <button
-                  onClick={exportToExcel}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-                >
-                  Export All (Excel)
-                </button>
+                
               </div>
             </div>
           </div>
@@ -626,7 +605,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
           subtitle={`${powerPercentage.toFixed(0)}% of peak`}
         />
         <SummaryCard
-          title="Energy Today"
+          title="Weekly Energy"
           value={`${displayData.energy.toFixed(2)} kWh`}
           icon="🔋"
           color="bg-green-500"
@@ -684,89 +663,14 @@ export default function EnhancedDashboard({ powerData, deviceLabels, historicalD
       <div className="bg-gray-800 rounded-lg p-4 mb-6">
         {activeTab === "power" && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Power Consumption History
-            </h2>
-            <div className="h-64">
-              <Line
-                data={powerChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      mode: "index",
-                      intersect: false,
-                      backgroundColor: "rgba(31, 41, 55, 0.9)",
-                      callbacks: {
-                        label: (context) => `${context.dataset.label}: ${context.raw} W`
-                      }
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                      title: {
-                        display: true,
-                        text: 'Power (W)',
-                        color: '#9CA3AF'
-                      }
-                    },
-                    x: {
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                    },
-                  },
-                }}
-              />
-            </div>
+            
+            
           </div>
         )}
 
         {activeTab === "cost" && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Cost History
-            </h2>
-            <div className="h-64">
-              <Line
-                data={costChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      mode: "index",
-                      intersect: false,
-                      backgroundColor: "rgba(31, 41, 55, 0.9)",
-                      callbacks: {
-                        label: (context) => `${context.dataset.label}: ₹${context.raw.toFixed(2)}`
-                      }
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                      title: {
-                        display: true,
-                        text: 'Cost (₹)',
-                        color: '#9CA3AF'
-                      }
-                    },
-                    x: {
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                    },
-                  },
-                }}
-              />
-            </div>
+           
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-700 p-4 rounded-lg">
                 <h3 className="text-lg font-medium text-gray-100 mb-2">Tariff Information</h3>

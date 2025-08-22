@@ -11,10 +11,6 @@ const deviceIcons = {
   mirror: "🪞",
   chimney: "🏭",
   washingmachine: "🧺",
-  table: "🪑",
-  carpet: "🧶",
-  bed: "🛏️",
-  sofa: "🛋️",
 };
 
 const deviceLabels = {
@@ -26,10 +22,6 @@ const deviceLabels = {
   mirror: "Mirror Light",
   chimney: "Chimney",
   washingmachine: "Washing Machine",
-  table: "Table",
-  carpet: "Carpet",
-  bed: "Bed",
-  sofa: "Sofa",
 };
 
 const ALERT_THRESHOLDS = {

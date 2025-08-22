@@ -29,7 +29,7 @@ const POWER_CONFIG = {
   minuteInterval: 60000,
 };
 
-class room1bhk  extends Phaser.Scene {
+class room2bhk extends Phaser.Scene {
   constructor() {
     super("SmartHomeScene");
     this.devices = [];
@@ -41,7 +41,7 @@ class room1bhk  extends Phaser.Scene {
     this.peakPower = 0;
     this.lastUpdateTime = Date.now();
     this.lastSavedTime = 0;
-    this.gameStateKey = "smartHome";
+    this.gameStateKey = "smartHomeFull2";
     this.fridgeCycleState = false;
     this.fridgeCycleTimer = 0;
     this.currentDate = new Date().toDateString();
@@ -50,15 +50,30 @@ class room1bhk  extends Phaser.Scene {
   preload() {
     this.load.image("int1", "/assets/tilesets/int1.png");
     this.load.image("int2", "/assets/tilesets/int2.png");
+    this.load.image("int3", "/assets/tilesets/int3.png");
     this.load.image("tiles2", "/assets/tilesets/tiles2.png");
     this.load.image("tiles3", "/assets/tilesets/tiles3.png");
+    this.load.image("tiles", "/assets/tilesets/tiles.png");
     this.load.image("walls", "/assets/tilesets/walls.png");
-    this.load.tilemapTiledJSON("map", "/assets/tilemaps/1bhk.tmj");
-     this.load.image('walls2', '/assets/tilesets/walls2.png');
+    this.load.image("walls2", "/assets/tilesets/walls2.png");
+    this.load.image("walls3", "/assets/tilesets/walls3.png");
+    this.load.image("walls4", "/assets/tilesets/walls4.png");
+    this.load.image("grass", "/assets/tilesets/grass.png");
+    this.load.image("carpets", "/assets/tilesets/carpets.png");
+    this.load.image("floor", "/assets/tilesets/floor.png");
 
-    Object.keys(POWER_CONFIG.devices).forEach((device) => {
-      this.load.image(device, `/assets/devices/${device}.png`);
-    });
+    this.load.tilemapTiledJSON("map", "/assets/tilemaps/3bhk.tmj");
+
+    this.load.image("tv", "/assets/devices/tv.png");
+    this.load.image("table", "/assets/devices/table.png");
+    this.load.image("light", "/assets/devices/light.png");
+    this.load.image("fan", "/assets/devices/fan.png");
+    this.load.image("carpet", "/assets/devices/carpet.png");
+    this.load.image("mirror", "/assets/devices/mirror.png");
+    this.load.image("chimney", "/assets/devices/chimney.png");
+    this.load.image("washingmachine", "/assets/devices/washingmachine.png");
+    this.load.image("bed", "/assets/devices/bed.png");
+    this.load.image("sofa", "/assets/devices/sofa.png");
   }
 
   create() {
@@ -74,10 +89,16 @@ class room1bhk  extends Phaser.Scene {
     const tilesets = [
       map.addTilesetImage("int1", "int1"),
       map.addTilesetImage("int2", "int2"),
+      map.addTilesetImage("int3", "int3"),
       map.addTilesetImage("tiles2", "tiles2"),
       map.addTilesetImage("tiles3", "tiles3"),
+      map.addTilesetImage("tiles", "tiles"),
       map.addTilesetImage("walls", "walls"),
-      map.addTilesetImage('walls2', 'walls2'),
+      map.addTilesetImage("walls2", "walls2"),
+      map.addTilesetImage("walls3", "walls3"),
+      map.addTilesetImage("walls4", "walls4"),
+      map.addTilesetImage("grass", "grass"),
+      map.addTilesetImage("carpets", "carpets"),
     ];
 
     map.layers.forEach((layer) => map.createLayer(layer.name, tilesets));
@@ -133,13 +154,18 @@ class room1bhk  extends Phaser.Scene {
         key: deviceKey,
       });
 
-    const label = this.add.text(x, y + 40, `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`, {
-      fontFamily: 'Arial',
-      fontSize: '14px',
-      color: '#ffffff',
-      backgroundColor: '#000000',
-      padding: { x: 5, y: 2 }
-    })
+    const label = this.add.text(
+      x,
+      y + 40,
+      `${deviceConfig.label}: ${initialState ? "ON" : "OFF"}`,
+      {
+        fontFamily: "Arial",
+        fontSize: "20px", 
+        color: initialState ? "#10B981" : "#EF4444", 
+        backgroundColor: "#000000",
+        padding: { x: 5, y: 2 },
+      }
+    )
     .setOrigin(0.5)
     .setDepth(1000);
 
@@ -224,14 +250,16 @@ class room1bhk  extends Phaser.Scene {
   }
 
   toggleDevice(device) {
-    const key = device.texture?.key || "lamp";
-    const config = POWER_CONFIG.devices[key] || { label: "Tube Light" };
+    const key = device.texture?.key || "light";
+    const config = POWER_CONFIG.devices[key] || { label: "Unknown" };
     const newState = !device.getData("state");
     device.setData("state", newState);
 
     const labelObj = this.deviceLabels.find(item => item.device === device);
     if (labelObj) {
       labelObj.label.setText(`${config.label}: ${newState ? "ON" : "OFF"}`);
+      // FIX: Update label color here
+      labelObj.label.setColor(newState ? "#10B981" : "#EF4444");
     }
 
     if (config.type === "fan" && device.texture?.key) {
@@ -269,10 +297,15 @@ class room1bhk  extends Phaser.Scene {
     this.lastUpdateTime = now;
 
     // Update fridge cycle
-    this.fridgeCycleTimer += timeElapsed;
-    if (this.fridgeCycleTimer >= 1800) {
-      this.fridgeCycleTimer = 0;
-      this.fridgeCycleState = !this.fridgeCycleState;
+    const fridge = this.devices.find(d => d.getData('key') === 'fridge');
+    if (fridge) {
+        this.fridgeCycleTimer += timeElapsed;
+        if (this.fridgeCycleTimer >= 1800) {
+            this.fridgeCycleTimer = 0;
+            this.fridgeCycleState = !this.fridgeCycleState;
+            fridge.setData('state', this.fridgeCycleState);
+            this.updateDeviceLabel(fridge);
+        }
     }
 
     let totalPower = 0;
@@ -284,7 +317,7 @@ class room1bhk  extends Phaser.Scene {
       const power = isOn ? POWER_CONFIG.devices.light.wattage : 0;
       totalPower += power;
       deviceDetails.push({
-        name: "Lamp",
+        name: "Tube Light",
         power,
         state: isOn ? "ON" : "OFF",
         type: "light",
@@ -336,13 +369,15 @@ class room1bhk  extends Phaser.Scene {
     this.sendToDashboard(deviceDetails);
   }
 
-  startPowerMonitoring() {
-    this.time.addEvent({
-      delay: POWER_CONFIG.updateInterval,
-      callback: this.updatePowerConsumption,
-      callbackScope: this,
-      loop: true,
-    });
+  updateDeviceLabel(device) {
+    const labelObj = this.deviceLabels.find(item => item.device === device);
+    if (labelObj) {
+      const config = POWER_CONFIG.devices[device.getData('key')];
+      const state = device.getData('state');
+      const stateText = state ? (config.alwaysOn ? 'RUNNING' : 'ON') : (config.alwaysOn ? 'IDLE' : 'OFF');
+      labelObj.label.setText(`${config.label}: ${stateText}`);
+      labelObj.label.setColor(state ? "#10B981" : "#EF4444");
+    }
   }
 
   saveFullState() {
@@ -377,12 +412,12 @@ class room1bhk  extends Phaser.Scene {
     try {
       const state = JSON.parse(savedState);
       
-      // Check if we need to reset daily metrics (new day)
       const today = new Date().toDateString();
       if (state.currentDate !== today) {
         state.dailyEnergy = 0;
         state.dailyCost = 0;
         state.peakPower = 0;
+        state.currentDate = today;
       }
       
       if (state.lamps && this.lamps.length > 0) {
@@ -467,16 +502,16 @@ const config = {
   type: Phaser.AUTO,
   width: window.innerWidth,
   height: window.innerHeight,
-  parent: "phaser-container1",
-  scene: room1bhk,
+  parent: "phaser-container2",
+  scene: room2bhk,
   backgroundColor: "#222",
   scale: {
     mode: Phaser.Scale.RESIZE,
     autoCenter: Phaser.Scale.CENTER_BOTH
   }
 };
-
+  
 window.addEventListener("load", () => {
   const game = new Phaser.Game(config);
-  window.gameScene = game.scene.getScene("room1bhk");
+  window.gameScene = game.scene.getScene("room2bhk");
 });

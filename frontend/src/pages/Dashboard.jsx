@@ -1,19 +1,8 @@
 import React, { useEffect, useState, useRef } from "react";
 import { Line, Pie, Bar } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  PointElement,
-  LineElement,
-  BarElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import { saveAs } from "file-saver";
-import * as XLSX from "xlsx";
+import { Chart as ChartJS, CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Title, Tooltip, Legend } from 'chart.js';
+import { saveAs } from 'file-saver';
+import * as XLSX from 'xlsx';
 
 // Register ChartJS components
 ChartJS.register(
@@ -37,23 +26,48 @@ const DEVICE_CONFIG = {
   microwave: { icon: "🍲", color: "bg-orange-500", wattage: 1000 },
   washingmachine: { icon: "🧺", color: "bg-indigo-500", wattage: 500 },
   computer: { icon: "💻", color: "bg-gray-500", wattage: 200 },
-  router: { icon: "📶", color: "bg-green-500", wattage: 10, alwaysOn: true },
+  router: { icon: "📶", color: "bg-green-500", wattage: 10, alwaysOn: true }
 };
 
+// Updated for Gujarat, India (Torrent Power approximate rates)
 const TARIFF_CONFIG = {
   residential: {
-    slab1: { limit: 100, rate: 3.5 },
-    slab2: { limit: 200, rate: 4.5 },
-    slab3: { limit: 300, rate: 6.5 },
-    slab4: { rate: 7.5 },
+    fixedCharges: 110, // ₹ per month
+    energyCharges: {
+      normal: 7.10, // ₹/kWh
+      peak: 7.90,   // ₹/kWh (for 6 PM - 10 PM)
+    },
+    peakHours: {
+      start: 18, // 6 PM
+      end: 22    // 10 PM
+    }
   },
   commercial: {
-    flatRate: 8.0,
-  },
-  fixedCharges: {
-    residential: 100,
-    commercial: 200,
-  },
+    fixedCharges: 250, // ₹ per month (example)
+    energyCharges: {
+      flat: 9.75 // ₹/kWh
+    }
+  }
+};
+
+// Helper function to get data from localStorage with fallback
+const getStoredData = (key, defaultValue = []) => {
+  try {
+    const item = localStorage.getItem(key);
+    return item ? JSON.parse(item) : defaultValue;
+  } catch (error) {
+    console.error(`Error reading ${key} from localStorage:`, error);
+    return defaultValue;
+  }
+};
+
+// Helper function to save data to localStorage
+const saveDataToStorage = (key, data) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(data));
+  } catch (error) {
+    console.error(`Error saving ${key} to localStorage:`, error);
+  }
 };
 
 function SummaryCard({ title, value, icon, color, trend, subtitle }) {
@@ -109,151 +123,193 @@ function SummaryCard({ title, value, icon, color, trend, subtitle }) {
   );
 }
 
-export default function EnhancedDashboard({ powerData, deviceLabels }) {
-  const [loading, setLoading] = useState(false);
+export default function EnhancedDashboard({ powerData, deviceLabels, historicalData }) {
+  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState("power");
-  const [timeRange, setTimeRange] = useState("1h");
   const [energyBreakdown, setEnergyBreakdown] = useState(null);
   const [deviceBreakdown, setDeviceBreakdown] = useState(null);
   const [tariffType, setTariffType] = useState("residential");
+  const [savedData, setSavedData] = useState(null);
   const [notification, setNotification] = useState(null);
   const [selectedDevice, setSelectedDevice] = useState(null);
   const [showDeviceModal, setShowDeviceModal] = useState(false);
+  const [storedHistoricalData, setStoredHistoricalData] = useState([]);
   const exportMenuRef = useRef(null);
 
-  // Ref to hold data points for the current hour
-  const historicalPointsRef = useRef([]);
-  // State to force a re-render when the ref data changes
-  const [reRender, setReRender] = useState(0);
-
-  // Function to schedule the next hourly reset
-  const scheduleHourlyReset = () => {
-    const now = new Date();
-    const minutesToNextHour = 60 - now.getMinutes();
-    const secondsToNextHour = minutesToNextHour * 60 - now.getSeconds();
-
-    const timeout = setTimeout(() => {
-      historicalPointsRef.current = [];
-      setReRender((prev) => prev + 1); // Trigger a re-render to clear the graph
-      scheduleHourlyReset(); // Schedule the next reset
-    }, secondsToNextHour * 1000);
-
-    return () => clearTimeout(timeout);
-  };
-
-  // Main effect to handle data updates and hourly reset
   useEffect(() => {
-    // Schedule the first hourly reset
-    scheduleHourlyReset();
+    const storedData = getStoredData('energyDashboardData');
+    const storedHistory = getStoredData('energyHistoricalData', []);
+    
+    setSavedData(storedData);
+    setStoredHistoricalData(storedHistory);
+    setLoading(false);
+  }, []);
 
-    // Add a new data point to the ref whenever powerData changes
+useEffect(() => {
     if (powerData) {
-      setLoading(false);
-      const newPoint = {
-        timestamp: new Date().toISOString(),
-        power: powerData.power,
-        energy: powerData.energy,
-        cost: powerData.cost,
-        peak: powerData.peak,
+      const cleanedPowerData = cleanData(powerData);
+      
+      const hourlyCost = calculateCost(cleanedPowerData.energy, cleanedPowerData.timestamp);
+      cleanedPowerData.cost = hourlyCost;
+      
+      calculateEnergyBreakdown(cleanedPowerData);
+      calculateDeviceBreakdown(cleanedPowerData);
+      
+      const dataToSave = {
+        ...cleanedPowerData,
+        timestamp: new Date().toISOString()
       };
-
-      historicalPointsRef.current = [...historicalPointsRef.current, newPoint];
-      setReRender((prev) => prev + 1); // Force a re-render to update UI
-
-      calculateEnergyBreakdown(powerData);
-      calculateDeviceBreakdown(powerData);
+      
+      saveDataToStorage('energyDashboardData', dataToSave);
+      setSavedData(dataToSave);
+      
+      const now = new Date();
+      const lastStored = storedHistoricalData.length > 0 
+        ? new Date(storedHistoricalData[storedHistoricalData.length - 1].timestamp) 
+        : null;
+      
+      const timeDiff = lastStored ? now - lastStored : Infinity;
+      const powerDiff = storedHistoricalData.length > 0 ? 
+        Math.abs(cleanedPowerData.power - storedHistoricalData[storedHistoricalData.length - 1].power) : 0;
+      
+      if (!lastStored || timeDiff > 15 * 60 * 1000 || powerDiff > 100) {
+        const newHistoricalData = [
+          ...storedHistoricalData,
+          {
+            timestamp: now.toISOString(),
+            power: cleanedPowerData.power,
+            energy: cleanedPowerData.energy,
+            cost: hourlyCost,
+            peak: cleanedPowerData.peak
+          }
+        ];
+        
+        // Keep only the last 7 days of data
+        const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const filteredData = newHistoricalData.filter(item => 
+          new Date(item.timestamp) > oneWeekAgo
+        );
+        
+        saveDataToStorage('energyHistoricalData', filteredData);
+        setStoredHistoricalData(filteredData);
+      }
     }
-  }, [powerData]);
+  }, [powerData, storedHistoricalData]);
 
-  // Handle outside click for export menu
+  
+
+
+  // Close export menu when clicking outside
   useEffect(() => {
     function handleClickOutside(event) {
-      if (
-        exportMenuRef.current &&
-        !exportMenuRef.current.contains(event.target)
-      ) {
-        document.getElementById("exportMenu")?.classList.add("hidden");
+      if (exportMenuRef.current && !exportMenuRef.current.contains(event.target)) {
+        document.getElementById('exportMenu')?.classList.add('hidden');
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  // Validate and clean data
+  const cleanData = (data) => {
+    if (!data) return null;
+    
+    // Clean power data
+    if (data.powerData) {
+      return {
+        ...data,
+        power: Number(data.power) || 0,
+        energy: Number(data.energy) || 0,
+        cost: Number(data.cost) || 0,
+        peak: Number(data.peak) || 0,
+        devices: data.devices?.map(device => ({
+          ...device,
+          power: Number(device.power) || 0,
+          state: device.state || 'OFF'
+        })) || []
+      };
+    }
+    
+    // Clean historical data
+    if (Array.isArray(data)) {
+      return data.map(item => ({
+        ...item,
+        power: Number(item.power) || 0,
+        energy: Number(item.energy) || 0,
+        cost: Number(item.cost) || 0,
+        peak: Number(item.peak) || 0,
+        timestamp: item.timestamp || new Date().toISOString()
+      }));
+    }
+    
+    return data;
+  };
+
   const calculateEnergyBreakdown = (data) => {
     if (!data?.devices) return;
+    
     const breakdown = data.devices.reduce((acc, device) => {
-      const type = device.type || "other";
+      const type = device.type || 'other';
       if (!acc[type]) acc[type] = { power: 0, count: 0 };
       acc[type].power += device.power || 0;
       acc[type].count += 1;
       return acc;
     }, {});
+
     setEnergyBreakdown(breakdown);
   };
 
   const calculateDeviceBreakdown = (data) => {
     if (!data?.devices) return;
+    
     const breakdown = data.devices.reduce((acc, device) => {
       const name = device.name || device.type;
       if (!acc[name]) acc[name] = { power: 0, state: device.state };
       acc[name].power += device.power || 0;
       return acc;
     }, {});
+
     setDeviceBreakdown(breakdown);
   };
 
-  const calculateCost = (kWh) => {
+  // Updated for Gujarat tariff with Time-of-Day pricing
+  const calculateCost = (kWh, timestamp) => {
     const tariff = TARIFF_CONFIG[tariffType];
     if (!tariff) return 0;
-    if (tariffType === "commercial") {
-      return kWh * tariff.flatRate + TARIFF_CONFIG.fixedCharges.commercial / 30;
+
+    // Calculate fixed charges per day
+    const fixedChargesPerDay = tariff.fixedCharges / 30; 
+    let energyCost = 0;
+
+    if (tariffType === 'commercial') {
+      // Commercial is simple flat rate
+      energyCost = kWh * tariff.energyCharges.flat;
+    } else {
+      // Residential uses Time-of-Day
+      const hourOfDay = new Date(timestamp).getHours();
+      const isPeakHour = hourOfDay >= tariff.peakHours.start && hourOfDay < tariff.peakHours.end;
+      energyCost = kWh * (isPeakHour ? tariff.energyCharges.peak : tariff.energyCharges.normal);
     }
-    let cost = 0;
-    let remainingUnits = kWh;
-    const slab1Units = Math.min(remainingUnits, tariff.slab1.limit);
-    cost += slab1Units * tariff.slab1.rate;
-    remainingUnits -= slab1Units;
-    if (remainingUnits <= 0)
-      return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
-    const slab2Units = Math.min(
-      remainingUnits,
-      tariff.slab2.limit - tariff.slab1.limit
-    );
-    cost += slab2Units * tariff.slab2.rate;
-    remainingUnits -= slab2Units;
-    if (remainingUnits <= 0)
-      return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
-    const slab3Units = Math.min(
-      remainingUnits,
-      tariff.slab3.limit - tariff.slab2.limit
-    );
-    cost += slab3Units * tariff.slab3.rate;
-    remainingUnits -= slab3Units;
-    if (remainingUnits <= 0)
-      return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
-    cost += remainingUnits * tariff.slab4.rate;
-    return cost + TARIFF_CONFIG.fixedCharges.residential / 30;
+
+    return energyCost + fixedChargesPerDay;
   };
 
   const formatTimestamp = (timestamp) => {
-    if (!timestamp) return "";
+    if (!timestamp) return '';
     const date = new Date(timestamp);
-    return date.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+    return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   };
 
   const formatDate = (dateStr) => {
     const date = new Date(dateStr);
-    return date.toLocaleDateString("en-US", {
-      weekday: "short",
-      month: "short",
-      day: "numeric",
+    return date.toLocaleDateString('en-US', { 
+      weekday: 'short', 
+      month: 'short', 
+      day: 'numeric' 
     });
   };
 
-  const showNotification = (message, type = "info") => {
+  const showNotification = (message, type = 'info') => {
     setNotification({ message, type });
     setTimeout(() => setNotification(null), 5000);
   };
@@ -263,84 +319,108 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
     setShowDeviceModal(true);
   };
 
-  const displayData = powerData;
-  const filteredHistoricalData = historicalPointsRef.current;
+  const displayData = cleanData(powerData || savedData);
+  const displayHistoricalData = storedHistoricalData.length > 0 ? storedHistoricalData : 
+      (cleanData(historicalData) || []);
+  
+  // This function now exclusively filters for the current day
+  const getFilteredHistoricalData = () => {
+    const now = new Date();
+    const todayStart = new Date(now);
+    todayStart.setHours(0, 0, 0, 0);
 
-  const exportToCSV = () => {
-    if (historicalPointsRef.current.length === 0) {
-      showNotification("No data available to export", "warning");
+    return displayHistoricalData.filter(item => {
+      const itemTime = new Date(item.timestamp);
+      return itemTime >= todayStart;
+    });
+  };
+
+  const filteredHistoricalData = storedHistoricalData.length > 0 ? storedHistoricalData : 
+    (cleanData(historicalData) || []);
+
+  // Export functions
+  const exportToCSV = (range = 'all') => {
+    let dataToExport = [];
+    const now = new Date();
+    
+    if (range === 'all') {
+      dataToExport = displayHistoricalData;
+    } else if (range === 'today') {
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
+      dataToExport = displayHistoricalData.filter(item => {
+        const itemTime = new Date(item.timestamp);
+        return itemTime >= todayStart;
+      });
+    } else if (range === 'week') {
+      const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      dataToExport = displayHistoricalData.filter(item => {
+        const itemTime = new Date(item.timestamp);
+        return itemTime >= oneWeekAgo;
+      });
+    } else if (range === 'month') {
+      const oneMonthAgo = new Date(now);
+      oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+      dataToExport = displayHistoricalData.filter(item => {
+        const itemTime = new Date(item.timestamp);
+        return itemTime >= oneMonthAgo;
+      });
+    }
+
+    if (dataToExport.length === 0) {
+      showNotification('No data available for the selected range', 'warning');
       return;
     }
-    const headers = [
-      "Timestamp",
-      "Power (W)",
-      "Energy (kWh)",
-      "Cost (₹)",
-      "Peak Power (W)",
-    ];
-    const rows = historicalPointsRef.current.map((item) => [
+
+    const headers = ['Timestamp', 'Power (W)', 'Energy (kWh)', 'Cost (₹)', 'Peak Power (W)'];
+    const rows = dataToExport.map(item => [
       new Date(item.timestamp).toLocaleString(),
       item.power,
       item.energy.toFixed(3),
       item.cost.toFixed(2),
-      item.peak,
+      item.peak
     ]);
-    let csvContent = headers.join(",") + "\n";
-    rows.forEach((row) => {
-      csvContent += row.join(",") + "\n";
+
+    let csvContent = headers.join(',') + '\n';
+    rows.forEach(row => {
+      csvContent += row.join(',') + '\n';
     });
-    const blob = new Blob([csvContent], {
-      type: "text/csv;charset=utf-8;",
-    });
-    saveAs(blob, `energy_data_${new Date().toISOString().split("T")[0]}.csv`);
-    showNotification("Exported to CSV successfully", "success");
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    saveAs(blob, `energy_data_${range}_${new Date().toISOString().split('T')[0]}.csv`);
+    showNotification(`Exported ${range} data successfully`, 'success');
   };
 
   const exportToExcel = () => {
-    if (historicalPointsRef.current.length === 0) {
-      showNotification("No data available to export", "warning");
+    if (displayHistoricalData.length === 0) {
+      showNotification('No data available to export', 'warning');
       return;
     }
-    const worksheet = XLSX.utils.json_to_sheet(
-      historicalPointsRef.current.map((item) => ({
-        Timestamp: new Date(item.timestamp).toLocaleString(),
-        "Power (W)": item.power,
-        "Energy (kWh)": item.energy.toFixed(3),
-        "Cost (₹)": item.cost.toFixed(2),
-        "Peak Power (W)": item.peak,
-      }))
-    );
+
+    const worksheet = XLSX.utils.json_to_sheet(displayHistoricalData.map(item => ({
+      'Timestamp': new Date(item.timestamp).toLocaleString(),
+      'Power (W)': item.power,
+      'Energy (kWh)': item.energy.toFixed(3),
+      'Cost (₹)': item.cost.toFixed(2),
+      'Peak Power (W)': item.peak
+    })));
+
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "EnergyData");
-    const excelBuffer = XLSX.write(workbook, {
-      bookType: "xlsx",
-      type: "array",
-    });
-    const data = new Blob([excelBuffer], {
-      type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    });
-    saveAs(data, `energy_data_${new Date().toISOString().split("T")[0]}.xlsx`);
-    showNotification("Exported to Excel successfully", "success");
+    const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+    const data = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    
+    saveAs(data, `energy_data_${new Date().toISOString().split('T')[0]}.xlsx`);
+    showNotification('Exported to Excel successfully', 'success');
   };
-
-  if (loading || !displayData) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-400">Loading energy data...</p>
-        </div>
-      </div>
-    );
-  }
 
   // Chart data configurations
   const powerChartData = {
-    labels: filteredHistoricalData.map((d) => formatTimestamp(d.timestamp)),
+    labels: filteredHistoricalData.map(d => formatTimestamp(d.timestamp)),
     datasets: [
       {
         label: "Power (W)",
-        data: filteredHistoricalData.map((d) => d.power),
+        data: filteredHistoricalData.map(d => d.power),
         borderColor: "#3b82f6",
         backgroundColor: "rgba(59, 130, 246, 0.1)",
         borderWidth: 2,
@@ -351,11 +431,11 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
   };
 
   const costChartData = {
-    labels: filteredHistoricalData.map((d) => formatTimestamp(d.timestamp)),
+    labels: filteredHistoricalData.map(d => formatTimestamp(d.timestamp)),
     datasets: [
       {
         label: "Cost (₹)",
-        data: filteredHistoricalData.map((d) => d.cost),
+        data: filteredHistoricalData.map(d => d.cost),
         borderColor: "#10b981",
         backgroundColor: "rgba(16, 185, 129, 0.1)",
         borderWidth: 2,
@@ -369,9 +449,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
     labels: energyBreakdown ? Object.keys(energyBreakdown) : [],
     datasets: [
       {
-        data: energyBreakdown
-          ? Object.values(energyBreakdown).map((v) => v.power)
-          : [],
+        data: energyBreakdown ? Object.values(energyBreakdown).map((v) => v.power) : [],
         backgroundColor: [
           "#6366f1",
           "#8b5cf6",
@@ -380,7 +458,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
           "#10b981",
           "#0ea5e9",
           "#f59e0b",
-          "#84cc16",
+          "#84cc16"
         ],
         borderWidth: 1,
       },
@@ -388,14 +466,14 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
   };
 
   // Group data by day for weekly trends
-  const dailyData = historicalPointsRef.current.reduce((acc, item) => {
-    const date = new Date(item.timestamp).toISOString().split("T")[0];
+  const dailyData = displayHistoricalData.reduce((acc, item) => {
+    const date = item.timestamp.split('T')[0];
     if (!acc[date]) {
       acc[date] = {
         date,
         energy: 0,
         cost: 0,
-        power: [],
+        power: []
       };
     }
     acc[date].energy += item.energy;
@@ -405,47 +483,55 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
   }, {});
 
   const dailySummaryData = {
-    labels: Object.values(dailyData).map((item) => formatDate(item.date)),
+    labels: Object.values(dailyData).map(item => formatDate(item.date)),
     datasets: [
       {
         label: "Daily Energy (kWh)",
-        data: Object.values(dailyData).map((item) =>
-          parseFloat(item.energy.toFixed(2))
-        ),
+        data: Object.values(dailyData).map(item => parseFloat(item.energy.toFixed(2))),
         backgroundColor: "rgba(59, 130, 246, 0.7)",
         borderColor: "rgba(59, 130, 246, 1)",
-        borderWidth: 1,
-      },
-    ],
+        borderWidth: 1
+      }
+    ]
   };
 
-  const currentPower =
-    filteredHistoricalData.length > 0
-      ? filteredHistoricalData[filteredHistoricalData.length - 1].power
-      : 0;
+  const powerPercentage = displayData && displayData.peak > 0 
+    ? (displayData.power / displayData.peak * 100) 
+    : 0;
 
-  const peakPower =
-    filteredHistoricalData.length > 0
-      ? Math.max(...filteredHistoricalData.map((d) => d.power))
-      : 0;
+  const monthlyCostEstimate = displayData ? calculateCost((displayData.energy || 0) * 30, displayData.timestamp) : 0;
 
-  const powerPercentage = peakPower > 0 ? (currentPower / peakPower) * 100 : 0;
-  const monthlyCostEstimate = calculateCost((displayData.energy || 0) * 30);
+  if (loading && !savedData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
+          <p className="text-gray-400">Loading energy data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!displayData) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <p className="text-gray-400">No energy data available</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="p-4 h-full overflow-y-auto">
       {notification && (
-        <div
-          className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-md shadow-lg ${
-            notification.type === "success"
-              ? "bg-green-500"
-              : notification.type === "warning"
-              ? "bg-yellow-500"
-              : "bg-blue-500"
-          } text-white`}
-        >
+        <div className={`fixed top-4 right-4 z-50 px-4 py-2 rounded-md shadow-lg ${
+          notification.type === 'success' ? 'bg-green-500' :
+          notification.type === 'warning' ? 'bg-yellow-500' :
+          'bg-blue-500'
+        } text-white`}>
           {notification.message}
-          <button
+          <button 
             onClick={() => setNotification(null)}
             className="ml-2 font-bold"
           >
@@ -458,17 +544,17 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
         <div>
           <h1 className="text-2xl font-bold text-gray-100">Energy Dashboard</h1>
           <p className="text-gray-400">
-            {new Date().toLocaleDateString("en-US", {
-              weekday: "long",
-              year: "numeric",
-              month: "long",
-              day: "numeric",
-              hour: "2-digit",
-              minute: "2-digit",
+            {new Date(displayData.timestamp).toLocaleDateString('en-US', {
+              weekday: 'long',
+              year: 'numeric',
+              month: 'long',
+              day: 'numeric',
+              hour: '2-digit',
+              minute: '2-digit'
             })}
           </p>
         </div>
-
+        
         <div className="flex flex-wrap gap-2">
           <select
             value={tariffType}
@@ -478,47 +564,26 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
             <option value="residential">Residential</option>
             <option value="commercial">Commercial</option>
           </select>
-
+          
           <div className="relative" ref={exportMenuRef}>
             <button
               className="px-3 py-1 rounded-md bg-green-600 text-white flex items-center gap-1"
-              onClick={() =>
-                document.getElementById("exportMenu").classList.toggle("hidden")
-              }
+              onClick={() => document.getElementById('exportMenu').classList.toggle('hidden')}
             >
               <span>Export</span>
-              <svg
-                className="w-4 h-4"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M19 9l-7 7-7-7"
-                ></path>
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
               </svg>
             </button>
-            <div
-              id="exportMenu"
-              className="hidden absolute right-0 mt-1 w-48 bg-gray-800 rounded-md shadow-lg z-10 border border-gray-700"
-            >
+            <div id="exportMenu" className="hidden absolute right-0 mt-1 w-48 bg-gray-800 rounded-md shadow-lg z-10 border border-gray-700">
               <div className="py-1">
                 <button
-                  onClick={exportToCSV}
+                  onClick={() => exportToCSV('all')}
                   className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
                 >
-                  Export Current View (CSV)
+                  Export  Data (CSV)
                 </button>
-                <div className="border-t border-gray-700"></div>
-                <button
-                  onClick={exportToExcel}
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700"
-                >
-                  Export All (Excel)
-                </button>
+                
               </div>
             </div>
           </div>
@@ -528,13 +593,19 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <SummaryCard
           title="Current Power"
-          value={`${currentPower} W`}
+          value={`${displayData.power} W`}
           icon="⚡"
           color="bg-blue-500"
+          trend={
+            filteredHistoricalData.length > 1 &&
+            displayData.power > filteredHistoricalData[filteredHistoricalData.length - 2]?.power
+              ? "up"
+              : "down"
+          }
           subtitle={`${powerPercentage.toFixed(0)}% of peak`}
         />
         <SummaryCard
-          title="Energy Today"
+          title="Weekly Energy"
           value={`${displayData.energy.toFixed(2)} kWh`}
           icon="🔋"
           color="bg-green-500"
@@ -542,253 +613,113 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
         />
         <SummaryCard
           title="Peak Power"
-          value={`${peakPower} W`}
+          value={`${displayData.peak} W`}
           icon="📈"
           color="bg-purple-500"
-          subtitle={new Date().toLocaleTimeString()}
+          subtitle={new Date(displayData.timestamp).toLocaleTimeString()}
         />
         <SummaryCard
           title="Monthly Estimate"
           value={`₹${monthlyCostEstimate.toFixed(2)}`}
           icon="💰"
           color="bg-yellow-500"
-          subtitle={`${
-            tariffType === "residential" ? "Residential" : "Commercial"
-          } rate`}
+          subtitle={`${tariffType === 'residential' ? 'Residential' : 'Commercial'} rate`}
         />
       </div>
 
       <div className="flex border-b border-gray-700 mb-4 overflow-x-auto">
         <button
-          className={`px-4 py-2 font-medium whitespace-nowrap ${
-            activeTab === "power"
-              ? "text-blue-400 border-b-2 border-blue-400"
-              : "text-gray-400"
-          }`}
+          className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "power" ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
           onClick={() => setActiveTab("power")}
         >
           Power Consumption
         </button>
         <button
-          className={`px-4 py-2 font-medium whitespace-nowrap ${
-            activeTab === "cost"
-              ? "text-blue-400 border-b-2 border-blue-400"
-              : "text-gray-400"
-          }`}
+          className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "cost" ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
           onClick={() => setActiveTab("cost")}
         >
           Cost Analysis
         </button>
         <button
-          className={`px-4 py-2 font-medium whitespace-nowrap ${
-            activeTab === "breakdown"
-              ? "text-blue-400 border-b-2 border-blue-400"
-              : "text-gray-400"
-          }`}
+          className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "breakdown" ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
           onClick={() => setActiveTab("breakdown")}
         >
           Energy Breakdown
         </button>
         <button
-          className={`px-4 py-2 font-medium whitespace-nowrap ${
-            activeTab === "devices"
-              ? "text-blue-400 border-b-2 border-blue-400"
-              : "text-gray-400"
-          }`}
+          className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "devices" ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
           onClick={() => setActiveTab("devices")}
         >
           Devices
         </button>
         <button
-          className={`px-4 py-2 font-medium whitespace-nowrap ${
-            activeTab === "trends"
-              ? "text-blue-400 border-b-2 border-blue-400"
-              : "text-gray-400"
-          }`}
+          className={`px-4 py-2 font-medium whitespace-nowrap ${activeTab === "trends" ? 'text-blue-400 border-b-2 border-blue-400' : 'text-gray-400'}`}
           onClick={() => setActiveTab("trends")}
         >
-          Daily Trends
+          Weekly Trends
         </button>
       </div>
 
       <div className="bg-gray-800 rounded-lg p-4 mb-6">
         {activeTab === "power" && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Power Consumption Over Time
-            </h2>
-            <div className="h-64">
-              <Line
-                data={powerChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      mode: "index",
-                      intersect: false,
-                      backgroundColor: "rgba(31, 41, 55, 0.9)",
-                      callbacks: {
-                        label: (context) =>
-                          `${context.dataset.label}: ${context.raw} W`,
-                      },
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                      title: {
-                        display: true,
-                        text: "Power (W)",
-                        color: "#9CA3AF",
-                      },
-                    },
-                    x: {
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                    },
-                  },
-                }}
-              />
-            </div>
+            
+            
           </div>
         )}
 
         {activeTab === "cost" && (
           <div>
-            <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Cost Analysis
-            </h2>
-            <div className="h-64">
-              <Line
-                data={costChartData}
-                options={{
-                  responsive: true,
-                  maintainAspectRatio: false,
-                  plugins: {
-                    legend: { display: false },
-                    tooltip: {
-                      mode: "index",
-                      intersect: false,
-                      backgroundColor: "rgba(31, 41, 55, 0.9)",
-                      callbacks: {
-                        label: (context) =>
-                          `${context.dataset.label}: ₹${context.raw.toFixed(
-                            2
-                          )}`,
-                      },
-                    },
-                  },
-                  scales: {
-                    y: {
-                      beginAtZero: true,
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                      title: {
-                        display: true,
-                        text: "Cost (₹)",
-                        color: "#9CA3AF",
-                      },
-                    },
-                    x: {
-                      grid: { color: "rgba(55, 65, 81, 0.5)" },
-                      ticks: { color: "#9CA3AF" },
-                    },
-                  },
-                }}
-              />
-            </div>
+           
             <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-700 p-4 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-100 mb-2">
-                  Tariff Information
-                </h3>
+                <h3 className="text-lg font-medium text-gray-100 mb-2">Tariff Information</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Current Plan:</span>
                     <span className="text-white capitalize">{tariffType}</span>
                   </div>
-                  {tariffType === "residential" ? (
+                  {tariffType === 'residential' ? (
                     <>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">First 100 units:</span>
-                        <span className="text-white">
-                          ₹{TARIFF_CONFIG.residential.slab1.rate}/unit
-                        </span>
+                        <span className="text-gray-400">Normal Hours:</span>
+                        <span className="text-white">₹{TARIFF_CONFIG.residential.energyCharges.normal}/unit</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">101-200 units:</span>
-                        <span className="text-white">
-                          ₹{TARIFF_CONFIG.residential.slab2.rate}/unit
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">201-300 units:</span>
-                        <span className="text-white">
-                          ₹{TARIFF_CONFIG.residential.slab3.rate}/unit
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Above 300 units:</span>
-                        <span className="text-white">
-                          ₹{TARIFF_CONFIG.residential.slab4.rate}/unit
-                        </span>
+                        <span className="text-gray-400">Peak Hours (6PM-10PM):</span>
+                        <span className="text-white">₹{TARIFF_CONFIG.residential.energyCharges.peak}/unit</span>
                       </div>
                     </>
                   ) : (
                     <div className="flex justify-between">
                       <span className="text-gray-400">Flat Rate:</span>
-                      <span className="text-white">
-                        ₹{TARIFF_CONFIG.commercial.flatRate}/unit
-                      </span>
+                      <span className="text-white">₹{TARIFF_CONFIG.commercial.energyCharges.flat}/unit</span>
                     </div>
                   )}
                   <div className="flex justify-between">
                     <span className="text-gray-400">Fixed Charges:</span>
-                    <span className="text-white">
-                      ₹{TARIFF_CONFIG.fixedCharges[tariffType]}/month
-                    </span>
+                    <span className="text-white">₹{TARIFF_CONFIG[tariffType].fixedCharges}/month</span>
                   </div>
                 </div>
               </div>
               <div className="bg-gray-700 p-4 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-100 mb-2">
-                  Cost Breakdown
-                </h3>
+                <h3 className="text-lg font-medium text-gray-100 mb-2">Cost Breakdown</h3>
                 <div className="space-y-2">
                   <div className="flex justify-between">
                     <span className="text-gray-400">Energy Today:</span>
-                    <span className="text-white">
-                      {displayData.energy.toFixed(2)} kWh
-                    </span>
+                    <span className="text-white">{displayData.energy.toFixed(2)} kWh</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Energy Cost:</span>
-                    <span className="text-white">
-                      ₹
-                      {(
-                        calculateCost(displayData.energy) -
-                        TARIFF_CONFIG.fixedCharges[tariffType] / 30
-                      ).toFixed(2)}
-                    </span>
+                    <span className="text-white">₹{(displayData.cost - (TARIFF_CONFIG[tariffType].fixedCharges / 30)).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-400">Fixed Charges:</span>
-                    <span className="text-white">
-                      ₹
-                      {(TARIFF_CONFIG.fixedCharges[tariffType] / 30).toFixed(2)}
-                    </span>
+                    <span className="text-white">₹{(TARIFF_CONFIG[tariffType].fixedCharges / 30).toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between border-t border-gray-600 pt-2">
-                    <span className="text-gray-400 font-medium">
-                      Total Cost:
-                    </span>
-                    <span className="font-bold text-white">
-                      ₹{displayData.cost.toFixed(2)}
-                    </span>
+                    <span className="text-gray-400 font-medium">Total Cost:</span>
+                    <span className="font-bold text-white">₹{displayData.cost.toFixed(2)}</span>
                   </div>
                 </div>
               </div>
@@ -811,32 +742,25 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                     plugins: {
                       legend: {
                         position: "right",
-                        labels: {
+                        labels: { 
                           color: "#D1D5DB",
                           font: {
-                            size: 12,
+                            size: 12
                           },
-                          padding: 16,
+                          padding: 16
                         },
                       },
                       tooltip: {
                         callbacks: {
                           label: (context) => {
-                            const label = context.label || "";
+                            const label = context.label || '';
                             const value = context.raw || 0;
-                            const percentage =
-                              (context.dataset.data[context.dataIndex] /
-                                context.dataset.data.reduce(
-                                  (a, b) => a + b,
-                                  0
-                                )) *
-                              100;
-                            return `${label}: ${value} W (${percentage.toFixed(
-                              1
-                            )}%)`;
-                          },
-                        },
-                      },
+                            const percentage = context.dataset.data[context.dataIndex] / 
+                              context.dataset.data.reduce((a, b) => a + b, 0) * 100;
+                            return `${label}: ${value} W (${percentage.toFixed(1)}%)`;
+                          }
+                        }
+                      }
                     },
                   }}
                 />
@@ -857,18 +781,13 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                         <div
                           className="bg-blue-500 h-2 rounded-full"
                           style={{
-                            width: `${(data.power / currentPower) * 100}%`,
+                            width: `${(data.power / displayData.power) * 100}%`,
                           }}
                         ></div>
                       </div>
                       <div className="flex justify-between text-xs text-gray-400 mt-1">
-                        <span>
-                          {data.count} device{data.count !== 1 ? "s" : ""}
-                        </span>
-                        <span>
-                          {((data.power / currentPower) * 100).toFixed(1)}% of
-                          total
-                        </span>
+                        <span>{data.count} device{data.count !== 1 ? "s" : ""}</span>
+                        <span>{((data.power / displayData.power) * 100).toFixed(1)}% of total</span>
                       </div>
                     </div>
                   ))}
@@ -906,10 +825,10 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                 </thead>
                 <tbody className="bg-gray-800 divide-y divide-gray-700">
                   {displayData.devices?.map((device, index) => {
-                    const hourlyCost = calculateCost(device.power / 1000);
+                    const hourlyCost = calculateCost(device.power / 1000, displayData.timestamp);
                     return (
-                      <tr
-                        key={index}
+                      <tr 
+                        key={index} 
                         className="hover:bg-gray-700 cursor-pointer"
                         onClick={() => handleDeviceClick(device)}
                       >
@@ -917,7 +836,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                           <div className="flex items-center">
                             <div className="flex-shrink-0 h-10 w-10 bg-gray-700 rounded-full flex items-center justify-center">
                               <span className="text-lg">
-                                {DEVICE_CONFIG[device.type]?.icon || "📱"}
+                                {DEVICE_CONFIG[device.type]?.icon || '📱'}
                               </span>
                             </div>
                             <div className="ml-4">
@@ -966,7 +885,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
         {activeTab === "trends" && (
           <div>
             <h2 className="text-xl font-semibold text-gray-100 mb-4">
-              Daily Energy Trends
+              Weekly Energy Trends
             </h2>
             <div className="h-64 mb-6">
               <Bar
@@ -978,10 +897,9 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                     legend: { display: false },
                     tooltip: {
                       callbacks: {
-                        label: (context) =>
-                          `${context.dataset.label}: ${context.raw} kWh`,
-                      },
-                    },
+                        label: (context) => `${context.dataset.label}: ${context.raw} kWh`
+                      }
+                    }
                   },
                   scales: {
                     y: {
@@ -990,9 +908,9 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                       ticks: { color: "#9CA3AF" },
                       title: {
                         display: true,
-                        text: "Energy (kWh)",
-                        color: "#9CA3AF",
-                      },
+                        text: 'Energy (kWh)',
+                        color: '#9CA3AF'
+                      }
                     },
                     x: {
                       grid: { color: "rgba(55, 65, 81, 0.5)" },
@@ -1004,27 +922,16 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="bg-gray-700 p-4 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-100 mb-3">
-                  Daily Summary
-                </h3>
+                <h3 className="text-lg font-medium text-gray-100 mb-3">Weekly Summary</h3>
                 <div className="space-y-3">
                   {Object.values(dailyData).map((item, index) => {
-                    const cost = calculateCost(item.energy);
+                    const cost = calculateCost(item.energy, item.date);
                     return (
-                      <div
-                        key={index}
-                        className="flex justify-between items-center"
-                      >
-                        <span className="text-gray-300">
-                          {formatDate(item.date)}
-                        </span>
+                      <div key={index} className="flex justify-between items-center">
+                        <span className="text-gray-300">{formatDate(item.date)}</span>
                         <div className="flex items-center gap-4">
-                          <span className="text-gray-400 text-sm">
-                            {item.energy.toFixed(2)} kWh
-                          </span>
-                          <span className="font-medium text-white">
-                            ₹{cost.toFixed(2)}
-                          </span>
+                          <span className="text-gray-400 text-sm">{item.energy.toFixed(2)} kWh</span>
+                          <span className="font-medium text-white">₹{cost.toFixed(2)}</span>
                         </div>
                       </div>
                     );
@@ -1032,9 +939,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
                 </div>
               </div>
               <div className="bg-gray-700 p-4 rounded-lg">
-                <h3 className="text-lg font-medium text-gray-100 mb-3">
-                  Savings Tips
-                </h3>
+                <h3 className="text-lg font-medium text-gray-100 mb-3">Savings Tips</h3>
                 <ul className="space-y-2 text-gray-300">
                   <li className="flex items-start">
                     <span className="text-green-400 mr-2">✓</span>
@@ -1094,7 +999,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
             </svg>
             <div className="absolute inset-0 flex flex-col items-center justify-center">
               <span className="text-3xl font-bold text-white">
-                {currentPower} W
+                {displayData.power} W
               </span>
               <span className="text-gray-400">
                 {powerPercentage.toFixed(0)}% of peak
@@ -1109,7 +1014,7 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
           </div>
           <div className="flex justify-between w-full text-xs text-gray-400">
             <span>0 W</span>
-            <span>{peakPower} W (Peak)</span>
+            <span>{displayData.peak} W (Peak)</span>
           </div>
         </div>
       </div>
@@ -1121,38 +1026,22 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
               onClick={() => setShowDeviceModal(false)}
               className="absolute top-4 right-4 text-gray-400 hover:text-white"
             >
-              <svg
-                className="w-6 h-6"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth="2"
-                  d="M6 18L18 6M6 6l12 12"
-                ></path>
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path>
               </svg>
             </button>
-
+            
             <h2 className="text-xl font-bold text-white mb-2 flex items-center gap-2">
-              <span
-                className={`${
-                  DEVICE_CONFIG[selectedDevice.type]?.color || "bg-gray-500"
-                } w-8 h-8 rounded-full flex items-center justify-center`}
-              >
-                {DEVICE_CONFIG[selectedDevice.type]?.icon || "📱"}
+              <span className={`${DEVICE_CONFIG[selectedDevice.type]?.color || 'bg-gray-500'} w-8 h-8 rounded-full flex items-center justify-center`}>
+                {DEVICE_CONFIG[selectedDevice.type]?.icon || '📱'}
               </span>
               {selectedDevice.name}
             </h2>
-
+            
             <div className="space-y-4 mt-4">
               <div className="flex justify-between">
                 <span className="text-gray-400">Type:</span>
-                <span className="text-white capitalize">
-                  {selectedDevice.type}
-                </span>
+                <span className="text-white capitalize">{selectedDevice.type}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Power Consumption:</span>
@@ -1160,77 +1049,59 @@ export default function EnhancedDashboard({ powerData, deviceLabels }) {
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Hourly Cost:</span>
-                <span className="text-white">
-                  ₹{calculateCost(selectedDevice.power / 1000).toFixed(2)}
-                </span>
+                <span className="text-white">₹{calculateCost(selectedDevice.power / 1000, displayData.timestamp).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Daily Cost (24hrs):</span>
-                <span className="text-white">
-                  ₹
-                  {(calculateCost(selectedDevice.power / 1000) * 24).toFixed(2)}
-                </span>
+                <span className="text-white">₹{(calculateCost(selectedDevice.power / 1000, displayData.timestamp) * 24).toFixed(2)}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray-400">Status:</span>
-                <span
-                  className={`px-2 py-1 text-xs rounded-full ${
-                    selectedDevice.state === "ON"
-                      ? "bg-green-500 text-white"
-                      : selectedDevice.state === "OFF"
-                      ? "bg-gray-500 text-white"
-                      : "bg-yellow-500 text-white"
-                  }`}
-                >
+                <span className={`px-2 py-1 text-xs rounded-full ${
+                  selectedDevice.state === "ON"
+                    ? "bg-green-500 text-white"
+                    : selectedDevice.state === "OFF"
+                    ? "bg-gray-500 text-white"
+                    : "bg-yellow-500 text-white"
+                }`}>
                   {selectedDevice.state}
                 </span>
               </div>
             </div>
-
+            
             <div className="mt-6 pt-4 border-t border-gray-700">
-              <h3 className="text-lg font-medium text-gray-100 mb-2">
-                Energy Saving Tips
-              </h3>
+              <h3 className="text-lg font-medium text-gray-100 mb-2">Energy Saving Tips</h3>
               <ul className="text-sm text-gray-300 space-y-2">
-                {selectedDevice.type === "light" && (
+                {selectedDevice.type === 'light' && (
                   <>
                     <li>• Switch to LED bulbs which use 75% less energy</li>
                     <li>• Turn off lights when not in use</li>
                     <li>• Use natural light during daytime</li>
                   </>
                 )}
-                {selectedDevice.type === "fan" && (
+                {selectedDevice.type === 'fan' && (
                   <>
                     <li>• Use ceiling fans instead of AC when possible</li>
                     <li>• Turn off fans when leaving the room</li>
                     <li>• Clean fan blades regularly for better efficiency</li>
                   </>
                 )}
-                {selectedDevice.type === "ac" && (
+                {selectedDevice.type === 'ac' && (
                   <>
                     <li>• Set temperature to 24°C or higher</li>
                     <li>• Use timer function to avoid overnight usage</li>
                     <li>• Ensure proper insulation of the room</li>
                   </>
                 )}
-                {selectedDevice.type === "fridge" && (
+                {selectedDevice.type === 'fridge' && (
                   <>
-                    <li>
-                      • Keep refrigerator well-stocked (but not overcrowded)
-                    </li>
+                    <li>• Keep refrigerator well-stocked (but not overcrowded)</li>
                     <li>• Ensure proper door seals</li>
-                    <li>
-                      • Set temperature between 3-5°C for fridge, -18°C for
-                      freezer
-                    </li>
+                    <li>• Set temperature between 3-5°C for fridge, -18°C for freezer</li>
                   </>
                 )}
-                {!["light", "fan", "ac", "fridge"].includes(
-                  selectedDevice.type
-                ) && (
-                  <li>
-                    Unplug when not in use to avoid standby power consumption
-                  </li>
+                {!['light', 'fan', 'ac', 'fridge'].includes(selectedDevice.type) && (
+                  <li>Unplug devices when not in use to avoid standby power consumption</li>
                 )}
               </ul>
             </div>
